@@ -25,35 +25,35 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <Octicons name="home-fill" size={28} color="black" />,
+          tabBarIcon: ({ color }) => <Octicons name="home-fill" size={28} color={color} />,
         }}
       />
       <Tabs.Screen
         name="habbits"
         options={{
           title: 'Habbits',
-          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="heart-plus" size={28} color="black" />,
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="heart-plus" size={28} color={color} />,
         }}
       />
       <Tabs.Screen
         name="streak"
         options={{
           title: 'Streak',
-          tabBarIcon: ({ color }) => <Ionicons name="calendar-clear" size={28} color="black" />,
+          tabBarIcon: ({ color }) => <Ionicons name="calendar-clear" size={28} color={color} />,
         }}
       />
       <Tabs.Screen
         name="customize"
         options={{
           title: 'Customize',
-          tabBarIcon: ({ color }) => <Entypo name="pencil" size={28} color="black" />,
+          tabBarIcon: ({ color }) => <Entypo name="pencil" size={28} color={color} />,
         }}
       />
       <Tabs.Screen
         name="aboutpage"
         options={{
           title: 'About Page',
-          tabBarIcon: ({ color }) => <FontAwesome5 name="question" size={28} color="black" />,
+          tabBarIcon: ({ color }) => <FontAwesome5 name="question" size={28} color={color} />,
         }}
       />
     </Tabs>
