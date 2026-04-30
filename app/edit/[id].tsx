@@ -1,6 +1,6 @@
 import { supabase } from "@/supabase/supabase";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -15,141 +15,62 @@ type RecurrenceType = "daily" | "weekly" | "monthly" | "one_time" | "custom";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/*
-  CreateHabitScreen
-  -----------------
-  This screen allows the user to create and save a new habit.
-
-  Responsibilities:
-  1. Collect a habit name from the user.
-  2. Validate that the input is not empty.
-  3. Retrieve the currently authenticated user.
-  4. Save the new habit to the Supabase database.
-  5. Prevent duplicate submissions while the save is in progress.
-  6. Return the user to the main tab screen after a successful save.
-*/
-export default function CreateHabitScreen() {
+export default function EditHabitScreen() {
   const router = useRouter();
-
-  /*
-    habitName
-    ---------
-    Stores the text entered by the user in the habit name input field.
-  */
+  const { id } = useLocalSearchParams<{ id: string }>();
 
   const [habitName, setHabitName] = useState("");
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>("daily");
-  const [selectedWeekday, setSelectedWeekday] = useState<number>(1); // Monday
+  const [selectedWeekday, setSelectedWeekday] = useState<number>(1);
   const [selectedCustomDays, setSelectedCustomDays] = useState<number[]>([
     1, 3, 5,
-  ]); // M,W,F
+  ]);
   const [selectedMonthDay, setSelectedMonthDay] = useState<number>(1);
-
-  /*
-    busy
-    ----
-    Tracks whether a save operation is currently in progress.
-
-    This is used to:
-    - disable repeated taps on the buttons
-    - prevent duplicate habit submissions
-    - update the button text to show saving status
-  */
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  /*
-    handleSaveHabit
-    ---------------
-    Validates the entered habit name and saves it to Supabase.
+  useEffect(() => {
+    const loadHabit = async () => {
+      try {
+        if (!id) return;
 
-    Process:
-    1. Remove extra whitespace from the input.
-    2. Stop if the input is empty.
-    3. Stop if a save is already in progress.
-    4. Get the current logged-in user.
-    5. Insert the new habit into the "habits" table.
-    6. Clear the input and return to the main screen if successful.
-    7. Show an alert if an error occurs.
-  */
-  const handleSaveHabit = async () => {
-    const trimmedHabit = habitName.trim();
+        const { data, error } = await supabase
+          .from("habits")
+          .select("name, recurrence_type, recurrence_days, recurrence_date")
+          .eq("id", id)
+          .maybeSingle();
 
-    // Prevent blank habit names from being submitted.
-    if (!trimmedHabit) {
-      Alert.alert("Missing habit", "Please enter a habit name.");
-      return;
-    }
+        if (error) throw error;
+        if (!data) {
+          Alert.alert("Habit not found");
+          router.back();
+          return;
+        }
 
-    // Prevent duplicate saves if the button is tapped repeatedly.
-    if (busy) return;
+        setHabitName(data.name ?? "");
+        setRecurrenceType((data.recurrence_type as RecurrenceType) ?? "daily");
 
-    setBusy(true);
+        if (data.recurrence_type === "weekly" && data.recurrence_days?.length) {
+          setSelectedWeekday(data.recurrence_days[0]);
+        }
 
-    try {
-      // Retrieve the currently authenticated user.
-      const { data, error: userError } = await supabase.auth.getUser();
+        if (data.recurrence_type === "custom") {
+          setSelectedCustomDays(data.recurrence_days ?? []);
+        }
 
-      if (userError) throw userError;
-
-      const user = data.user;
-
-      // Stop if no authenticated user is available.
-      if (!user) {
-        Alert.alert("Not signed in", "Please sign in again.");
-        return;
+        if (data.recurrence_type === "monthly" && data.recurrence_date) {
+          setSelectedMonthDay(data.recurrence_date);
+        }
+      } catch (error: any) {
+        console.log("Error loading habit:", error);
+        Alert.alert("Error", error?.message ?? "Could not load habit.");
+      } finally {
+        setLoading(false);
       }
+    };
 
-      // Recurrence
-      let recurrenceDays = null;
-      let recurrenceDate = null;
-
-      switch (recurrenceType) {
-        case "weekly":
-          recurrenceDays = [selectedWeekday];
-          break;
-        case "custom":
-          recurrenceDays = selectedCustomDays;
-          break;
-        case "monthly":
-          recurrenceDate = selectedMonthDay;
-          break;
-        default:
-          break;
-      }
-
-      // Insert the new habit into the database for this specific user.
-      const { error } = await supabase.from("habits").insert({
-        user_id: user.id,
-        name: trimmedHabit,
-        recurrence_type: recurrenceType,
-        recurrence_days: recurrenceDays,
-        recurrence_date: recurrenceDate,
-      });
-
-      if (error) throw error;
-
-      // Clear the text field after a successful save.
-      setHabitName("");
-
-      /*
-        Replace the current screen with the main tabs screen.
-
-        router.replace() is used here so the user returns directly to
-        the app's main view after saving the new habit.
-      */
-      router.replace("/(tabs)");
-    } catch (error: any) {
-      console.log("Error saving habit:", error);
-
-      Alert.alert(
-        "Error saving habit",
-        error?.message ?? "Could not save habit.",
-      );
-    } finally {
-      // Re-enable interaction whether the save succeeded or failed.
-      setBusy(false);
-    }
-  };
+    loadHabit();
+  }, [id]);
 
   const toggleCustomDay = (dayIndex: number) => {
     if (selectedCustomDays.includes(dayIndex)) {
@@ -177,19 +98,82 @@ export default function CreateHabitScreen() {
     }
   };
 
+  const handleUpdateHabit = async () => {
+    const trimmedHabit = habitName.trim();
+
+    if (!trimmedHabit) {
+      Alert.alert("Missing habit", "Please enter a habit name.");
+      return;
+    }
+
+    if (busy) return;
+
+    setBusy(true);
+
+    try {
+      let recurrenceDays = null;
+      let recurrenceDate = null;
+
+      switch (recurrenceType) {
+        case "weekly":
+          recurrenceDays = [selectedWeekday];
+          break;
+        case "custom":
+          recurrenceDays = selectedCustomDays;
+          break;
+        case "monthly":
+          recurrenceDate = selectedMonthDay;
+          break;
+        default:
+          break;
+      }
+
+      const { error } = await supabase
+        .from("habits")
+        .update({
+          name: trimmedHabit,
+          recurrence_type: recurrenceType,
+          recurrence_days: recurrenceDays,
+          recurrence_date: recurrenceDate,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      router.replace("/(tabs)");
+    } catch (error: any) {
+      console.log("Error updating habit:", error);
+      Alert.alert(
+        "Error saving changes",
+        error?.message ?? "Could not update habit.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.screen}>
+        <View style={styles.heroSection}>
+          <Text style={styles.title}>Edit Habit</Text>
+          <Text style={styles.subtitle}>Loading habit...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
-      {/* Header section introducing the purpose of the page */}
       <View style={styles.heroSection}>
-        <Text style={styles.title}>Create Habit</Text>
-        <Text style={styles.subtitle}>Start building a new routine</Text>
+        <Text style={styles.title}>Edit Habit</Text>
+        <Text style={styles.subtitle}>Update your routine</Text>
       </View>
 
-      {/* Main form container */}
       <View style={styles.formCard}>
         <Text style={styles.label}>Habit Name</Text>
 
-        {/* Input field for the new habit name */}
         <TextInput
           value={habitName}
           onChangeText={setHabitName}
@@ -200,7 +184,6 @@ export default function CreateHabitScreen() {
 
         <Text style={styles.label}>How often?</Text>
 
-        {/* Recurrence options */}
         {[
           { type: "daily", label: "Daily" },
           { type: "weekly", label: "Weekly (specific day)" },
@@ -227,13 +210,11 @@ export default function CreateHabitScreen() {
           </Pressable>
         ))}
 
-        {/* Preview */}
         <View style={styles.previewContainer}>
           <Text style={styles.previewLabel}>Preview:</Text>
           <Text style={styles.previewText}>{getRecurrencePreview()}</Text>
         </View>
 
-        {/* Weekly day picker */}
         {recurrenceType === "weekly" && (
           <View style={styles.pickerContainer}>
             <Text style={styles.pickerLabel}>Select day:</Text>
@@ -261,7 +242,6 @@ export default function CreateHabitScreen() {
           </View>
         )}
 
-        {/* Custom days picker */}
         {recurrenceType === "custom" && (
           <View style={styles.pickerContainer}>
             <Text style={styles.pickerLabel}>Select days:</Text>
@@ -293,7 +273,7 @@ export default function CreateHabitScreen() {
             )}
           </View>
         )}
-        {/* Monthly date picker */}
+
         {recurrenceType === "monthly" && (
           <View style={styles.pickerContainer}>
             <Text style={styles.pickerLabel}>Select day of month:</Text>
@@ -323,18 +303,16 @@ export default function CreateHabitScreen() {
           </View>
         )}
 
-        {/* Primary action button to save the new habit */}
         <Pressable
           style={styles.primaryButton}
-          onPress={handleSaveHabit}
+          onPress={handleUpdateHabit}
           disabled={busy}
         >
           <Text style={styles.primaryButtonText}>
-            {busy ? "Saving..." : "Save Habit"}
+            {busy ? "Saving..." : "Save Changes"}
           </Text>
         </Pressable>
 
-        {/* Secondary action button to cancel and return to the previous screen */}
         <Pressable
           style={styles.secondaryButton}
           onPress={() => router.back()}
@@ -347,12 +325,6 @@ export default function CreateHabitScreen() {
   );
 }
 
-/*
-  Styles
-  ------
-  Defines the layout, spacing, colors, and button/input appearance
-  for the Create Habit screen.
-*/
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -400,9 +372,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 8,
   },
-  recurrenceOptionSelected: { backgroundColor: "#4d77ad" },
-  recurrenceText: { color: "#ffffff", fontSize: 15 },
-  recurrenceTextSelected: { fontWeight: "600" },
+
+  recurrenceOptionSelected: {
+    backgroundColor: "#4d77ad",
+  },
+
+  recurrenceText: {
+    color: "#ffffff",
+    fontSize: 15,
+  },
+
+  recurrenceTextSelected: {
+    fontWeight: "600",
+  },
+
   previewContainer: {
     backgroundColor: "#4a4a4a",
     borderRadius: 10,
@@ -410,11 +393,36 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 8,
   },
-  previewLabel: { color: "#aaaaaa", fontSize: 12, marginBottom: 4 },
-  previewText: { color: "#ffffff", fontSize: 14, fontWeight: "500" },
-  pickerContainer: { marginTop: 12, marginBottom: 16 },
-  pickerLabel: { color: "#f0f0f0", fontSize: 14, marginBottom: 8 },
-  weekdayRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+
+  previewLabel: {
+    color: "#aaaaaa",
+    fontSize: 12,
+    marginBottom: 4,
+  },
+
+  previewText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+
+  pickerContainer: {
+    marginTop: 12,
+    marginBottom: 16,
+  },
+
+  pickerLabel: {
+    color: "#f0f0f0",
+    fontSize: 14,
+    marginBottom: 8,
+  },
+
+  weekdayRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
   weekdayButton: {
     backgroundColor: "#4a4a4a",
     paddingVertical: 10,
@@ -423,10 +431,26 @@ const styles = StyleSheet.create({
     minWidth: 50,
     alignItems: "center",
   },
-  weekdayButtonSelected: { backgroundColor: "#79bd00" },
-  weekdayText: { color: "#ffffff", fontSize: 14 },
-  weekdayTextSelected: { fontWeight: "700" },
-  monthDayRow: { flexDirection: "row", gap: 6, paddingVertical: 4 },
+
+  weekdayButtonSelected: {
+    backgroundColor: "#79bd00",
+  },
+
+  weekdayText: {
+    color: "#ffffff",
+    fontSize: 14,
+  },
+
+  weekdayTextSelected: {
+    fontWeight: "700",
+  },
+
+  monthDayRow: {
+    flexDirection: "row",
+    gap: 6,
+    paddingVertical: 4,
+  },
+
   monthDayButton: {
     backgroundColor: "#4a4a4a",
     width: 44,
@@ -434,10 +458,25 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
   },
-  monthDayButtonSelected: { backgroundColor: "#79bd00" },
-  monthDayText: { color: "#ffffff", fontSize: 14 },
-  monthDayTextSelected: { fontWeight: "700" },
-  warningText: { color: "#ffaa00", fontSize: 12, marginTop: 8 },
+
+  monthDayButtonSelected: {
+    backgroundColor: "#79bd00",
+  },
+
+  monthDayText: {
+    color: "#ffffff",
+    fontSize: 14,
+  },
+
+  monthDayTextSelected: {
+    fontWeight: "700",
+  },
+
+  warningText: {
+    color: "#ffaa00",
+    fontSize: 12,
+    marginTop: 8,
+  },
 
   input: {
     backgroundColor: "#f7f7f7",
