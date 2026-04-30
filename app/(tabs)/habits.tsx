@@ -1,7 +1,14 @@
-import { View, Text, StyleSheet, Pressable, Alert, ScrollView } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { useState, useCallback } from 'react';
-import { supabase } from '@/supabase/supabase';
+import { supabase } from "@/supabase/supabase";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 export default function HabbitsScreen() {
   // Router is used for navigation, such as moving to the custom create-habit screen.
@@ -17,17 +24,17 @@ export default function HabbitsScreen() {
 
   // A list of built-in habit suggestions the user can quickly add/remove from their account.
   const basicHabits = [
-    'Brush Teeth',
-    'Eat Breakfast',
-    'Get Out of Bed',
-    'Shower',
-    '30 min run',
-    'Go for a Walk',
-    '30 min stretches',
-    'Wash Dishes',
-    'Wash Your Face',
-    'Read',
-    'Fix Your Bed',
+    "Brush Teeth",
+    "Eat Breakfast",
+    "Get Out of Bed",
+    "Shower",
+    "30 min run",
+    "Go for a Walk",
+    "30 min stretches",
+    "Wash Dishes",
+    "Wash Your Face",
+    "Read",
+    "Fix Your Bed",
   ];
 
   /**
@@ -53,9 +60,9 @@ export default function HabbitsScreen() {
 
       // Load the current user's saved habits from the habits table.
       const { data: habitsData, error } = await supabase
-        .from('habits')
-        .select('name')
-        .eq('user_id', user.id);
+        .from("habits")
+        .select("name")
+        .eq("user_id", user.id);
 
       if (error) throw error;
 
@@ -64,7 +71,9 @@ export default function HabbitsScreen() {
 
       basicHabits.forEach((habit, index) => {
         // Check whether this preset habit exists in the user's saved habits.
-        const exists = habitsData?.some((savedHabit) => savedHabit.name === habit);
+        const exists = habitsData?.some(
+          (savedHabit) => savedHabit.name === habit,
+        );
 
         // Save true/false for this row index.
         selectedMap[index] = !!exists;
@@ -72,7 +81,7 @@ export default function HabbitsScreen() {
 
       setSelected(selectedMap);
     } catch (error) {
-      console.log('Error loading selected habits:', error);
+      console.log("Error loading selected habits:", error);
     }
   };
 
@@ -86,7 +95,7 @@ export default function HabbitsScreen() {
   useFocusEffect(
     useCallback(() => {
       loadSelectedHabits();
-    }, [])
+    }, []),
   );
 
   /**
@@ -114,26 +123,26 @@ export default function HabbitsScreen() {
 
       // If the user is not signed in, show an alert.
       if (!user) {
-        Alert.alert('Not signed in', 'Please sign in again.');
+        Alert.alert("Not signed in", "Please sign in again.");
         return;
       }
 
       // Check whether this habit already exists for this user in Supabase.
       const { data: existingHabits, error: checkError } = await supabase
-        .from('habits')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('name', habitName);
+        .from("habits")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("name", habitName);
 
       if (checkError) throw checkError;
 
       // If the habit already exists, remove it from the database.
       if (existingHabits && existingHabits.length > 0) {
         const { error: deleteError } = await supabase
-          .from('habits')
+          .from("habits")
           .delete()
-          .eq('user_id', user.id)
-          .eq('name', habitName);
+          .eq("user_id", user.id)
+          .eq("name", habitName);
 
         if (deleteError) throw deleteError;
 
@@ -147,7 +156,7 @@ export default function HabbitsScreen() {
       }
 
       // If the habit does not exist yet, add it to the database.
-      const { error: insertError } = await supabase.from('habits').insert({
+      const { error: insertError } = await supabase.from("habits").insert({
         user_id: user.id,
         name: habitName,
       });
@@ -160,8 +169,8 @@ export default function HabbitsScreen() {
         [index]: true,
       }));
     } catch (error: any) {
-      console.log('Error toggling habit:', error);
-      Alert.alert('Error', error?.message ?? 'Could not update habit.');
+      console.log("Error toggling habit:", error);
+      Alert.alert("Error", error?.message ?? "Could not update habit.");
     } finally {
       // Clear busy state so rows can be tapped again.
       setBusyIndex(null);
@@ -194,7 +203,10 @@ export default function HabbitsScreen() {
             Special row that lets the user create a completely custom habit
             instead of choosing from the preset list.
           */}
-          <Pressable style={styles.customHabitRow} onPress={() => router.push('/create')}>
+          <Pressable
+            style={styles.customHabitRow}
+            onPress={() => router.push("/create")}
+          >
             <Text style={styles.customHabitText}>Write your own habit</Text>
             <View style={styles.plusBox}>
               <Text style={styles.plusText}>+</Text>
@@ -218,7 +230,12 @@ export default function HabbitsScreen() {
                 onPress={() => handleToggleHabit(habit, index)}
                 disabled={isBusy}
               >
-                <Text style={[styles.habitText, isSelected && styles.habitTextSelected]}>
+                <Text
+                  style={[
+                    styles.habitText,
+                    isSelected && styles.habitTextSelected,
+                  ]}
+                >
                   {habit}
                 </Text>
 
@@ -228,9 +245,11 @@ export default function HabbitsScreen() {
                   - "✓" means selected
                   - "..." means request is in progress
                 */}
-                <View style={[styles.plusBox, isSelected && styles.checkCircle]}>
+                <View
+                  style={[styles.plusBox, isSelected && styles.checkCircle]}
+                >
                   <Text style={styles.plusText}>
-                    {isBusy ? '...' : isSelected ? '✓' : '+'}
+                    {isBusy ? "..." : isSelected ? "✓" : "+"}
                   </Text>
                 </View>
               </Pressable>
@@ -246,30 +265,30 @@ const styles = StyleSheet.create({
   // Full screen background
   screen: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: "#000000",
     padding: 18,
   },
 
   // Main gray card that contains the page content
   mainCard: {
     flex: 1,
-    backgroundColor: '#5a5a5a',
+    backgroundColor: "#5a5a5a",
     borderRadius: 18,
     padding: 16,
   },
 
   // Header row layout
   topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 10,
   },
 
   // Back button area
   backButton: {
     width: 40,
-    alignItems: 'center',
+    alignItems: "center",
   },
 
   // Back arrow text
@@ -279,7 +298,7 @@ const styles = StyleSheet.create({
 
   // Blue title pill
   headerPill: {
-    backgroundColor: '#4d77ad',
+    backgroundColor: "#4d77ad",
     borderRadius: 20,
     paddingVertical: 6,
     paddingHorizontal: 25,
@@ -287,8 +306,8 @@ const styles = StyleSheet.create({
 
   // Title text inside pill
   headerPillText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: "#fff",
+    fontWeight: "600",
   },
 
   // Spacer used to keep title centered
@@ -298,13 +317,13 @@ const styles = StyleSheet.create({
 
   // Styling for the custom-habit row
   customHabitRow: {
-    backgroundColor: '#f6e6c5',
+    backgroundColor: "#f6e6c5",
     borderRadius: 10,
     padding: 12,
     marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 
   // Text for custom habit row
@@ -314,54 +333,54 @@ const styles = StyleSheet.create({
 
   // Base style for each preset habit row
   habitRow: {
-    backgroundColor: '#efefef',
+    backgroundColor: "#efefef",
     borderRadius: 10,
     padding: 12,
     marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 
   // Green highlight shown when a habit is selected
   habitRowSelected: {
-    backgroundColor: '#dff5d8',
+    backgroundColor: "#dff5d8",
   },
 
   // Default habit text style
   habitText: {
     fontSize: 15,
-    color: '#333333',
+    color: "#333333",
   },
 
   // Text style when selected
   habitTextSelected: {
-    textDecorationLine: 'line-through',
-    color: '#6e6e6e',
+    textDecorationLine: "line-through",
+    color: "#6e6e6e",
   },
 
   // Small square button on right side of each row
   plusBox: {
-    backgroundColor: '#f2b94b',
+    backgroundColor: "#f2b94b",
     width: 26,
     height: 26,
     borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
-    borderColor: '#8a6417',
+    borderColor: "#8a6417",
   },
 
   // Green version of the right-side button when selected
   checkCircle: {
-    backgroundColor: '#79bd00',
-    borderColor: '#5a8f00',
+    backgroundColor: "#79bd00",
+    borderColor: "#5a8f00",
   },
 
   // Text inside right-side button (+, ✓, or ...)
   plusText: {
-    fontWeight: '700',
+    fontWeight: "700",
     fontSize: 16,
-    color: '#5b3e00',
+    color: "#5b3e00",
   },
 });

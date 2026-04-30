@@ -369,7 +369,7 @@ export default function HomeScreen() {
                       {getRecurrenceText(habit.recurrence_type)}
                     </Text>
                     <Text style={styles.streakText}>
-                      🔥 {habit.current_streak} day streak
+                      {habit.current_streak} day streak
                     </Text>
                   </View>
                 </View>
@@ -387,7 +387,17 @@ export default function HomeScreen() {
                     {habit.completed_today ? "✓" : ""}
                   </Text>
                 </View>
-
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: "/edit/[id]",
+                      params: { id: habit.id },
+                    })
+                  }
+                  style={styles.editBox}
+                >
+                  <Text style={styles.editText}>Edit</Text>
+                </Pressable>
                 <Pressable
                   onPress={() => deleteHabit(habit)}
                   style={styles.deleteBox}
@@ -640,5 +650,19 @@ const styles = StyleSheet.create({
     fontSize: 26,
     color: "#5b3e00",
     fontWeight: "700",
+  },
+  editBox: {
+    width: 52,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#4d77ad",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  editText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "800",
   },
 });
