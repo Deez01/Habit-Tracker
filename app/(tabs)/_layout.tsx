@@ -1,150 +1,121 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Tabs } from "expo-router";
+import React from "react";
 
-// Custom tab button that adds haptic (vibration) feedback when pressed
-import { HapticTab } from '@/components/haptic-tab';
+import { HapticTab } from "@/components/haptic-tab";
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 
-// App color system
-import { Colors } from '@/constants/theme';
+import Ionicons from "@expo/vector-icons/Ionicons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
-// Detects light/dark mode
-import { useColorScheme } from '@/hooks/use-color-scheme';
+/*
+  TabLayout
+  ---------
+  Defines the bottom tab navigation for the app.
 
-// Icon libraries used for tab bar icons
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import Octicons from '@expo/vector-icons/Octicons';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import Entypo from '@expo/vector-icons/Entypo';
-import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
-
+  Responsibilities:
+  - Controls tab structure and routing
+  - Applies consistent styling to the tab bar
+  - Assigns icons and labels for each screen
+*/
 export default function TabLayout() {
-  // Detect whether the app is in light or dark mode
+  // Detect system theme (light/dark)
   const colorScheme = useColorScheme();
 
   return (
-    /**
-     * Tabs is the main navigation container for the bottom tab bar.
-     * Each <Tabs.Screen> represents one tab in the app.
-     */
     <Tabs
       screenOptions={{
-        /**
-         * Controls the color of the active (selected) tab icon.
-         * Uses the app's theme system so it changes with light/dark mode.
-         */
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        /*
+          Active tab color (depends on theme)
+        */
+        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
 
-        /**
-         * Hides the default header at the top of each screen.
-         * This allows full control over custom UI layouts.
-         */
+        /*
+          Remove default header for all tabs
+          (you control layout manually inside each screen)
+        */
         headerShown: false,
 
-        /**
-         * Replaces the default tab button with a custom one.
-         * This version adds haptic feedback (small vibration) on tap.
-         */
+        /*
+          Custom tab button with haptic feedback
+        */
         tabBarButton: HapticTab,
 
-        /**
-         * Styles the bottom tab bar itself.
-         */
+        /*
+          Tab bar styling
+        */
         tabBarStyle: {
-          backgroundColor: '#000000', // Dark background for a clean UI
-          borderTopWidth: 0,          // Removes default border line
-          height: 70,                 // Makes tab bar taller
-          paddingBottom: 10,          // Adds spacing for better icon alignment
+          backgroundColor: "#000000",
+          borderTopWidth: 0,
+          height: 70,
+          paddingBottom: 10,
         },
       }}
     >
-      {/* 
-        HOME TAB
-        This loads app/(tabs)/index.tsx
-      */}
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-
-          /**
-           * Icon shown in the tab bar.
-           * Octicons library is used here.
-           */
-          tabBarIcon: ({ color }) => (
-            <Octicons name="home-fill" size={26} color={color} />
-          ),
-        }}
-      />
-
-      {/* 
-        HABITS TAB
-        This loads app/(tabs)/habits.tsx
-      */}
-      <Tabs.Screen
-        name="habits"
-        options={{
-          title: 'Habits',
-
-          /**
-           * Icon representing habits (adding new habits / actions).
-           * Uses MaterialCommunityIcons.
-           */
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="heart-plus" size={26} color={color} />
-          ),
-        }}
-      />
-
-      {/* 
-        STREAK TAB
-        This loads app/(tabs)/streak.tsx
-      */}
+      {/* ===== STREAK TAB ===== */}
       <Tabs.Screen
         name="streak"
         options={{
-          title: 'Streak',
+          title: "Streak",
 
-          /**
-           * Calendar icon represents tracking progress over time.
-           */
+          /*
+            Icon: progress indicator
+          */
           tabBarIcon: ({ color }) => (
-            <Ionicons name="calendar-clear" size={26} color={color} />
+            <MaterialCommunityIcons
+              name="progress-check"
+              size={26}
+              color={color}
+            />
           ),
         }}
       />
 
-      {/* 
-        CUSTOMIZE TAB
-        This loads app/(tabs)/customize.tsx
-      */}
+      {/* ===== TODAY TAB ===== */}
       <Tabs.Screen
-        name="customize"
+        name="index"
         options={{
-          title: 'Customize',
+          title: "Today",
 
-          /**
-           * Pencil icon represents editing/customizing features.
-           */
+          /*
+            Icon: stopwatch/timer
+          */
           tabBarIcon: ({ color }) => (
-            <Entypo name="pencil" size={26} color={color} />
+            <MaterialCommunityIcons
+              name="timer-outline"
+              size={26}
+              color={color}
+            />
           ),
         }}
       />
 
-      {/* 
-        ABOUT TAB
-        This loads app/(tabs)/aboutpage.tsx
-      */}
+      {/* ===== UPCOMING TAB ===== */}
+      <Tabs.Screen
+        name="upcoming"
+        options={{
+          title: "Next Stops",
+
+          /*
+            Icon: train (fits theme)
+          */
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="train" size={26} color={color} />
+          ),
+        }}
+      />
+
+      {/* ===== PROFILE TAB ===== */}
       <Tabs.Screen
         name="aboutpage"
         options={{
-          title: 'About',
+          title: "Profile",
 
-          /**
-           * Question icon represents help/about information.
-           */
+          /*
+            Icon: user/profile
+          */
           tabBarIcon: ({ color }) => (
-            <FontAwesome5 name="question" size={24} color={color} />
+            <Ionicons name="person" size={24} color={color} />
           ),
         }}
       />
