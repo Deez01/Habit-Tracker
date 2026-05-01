@@ -1,14 +1,15 @@
 /*
- * File: app/create/index.tsx
- * Purpose: Allows users to create a new habit with custom recurrence patterns.
- * Supports daily, weekly (specific day), monthly (specific date), one-time, and custom (multiple days).
+ * File: app/edit/[id].tsx
+ * Purpose: Allows users to edit an existing habit's name and recurrence pattern.
+ * Loads existing habit data and updates it in Supabase.
+ * Very similar to create screen but with pre-populated values and update instead of insert.
  */
 
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { supabase } from "@/supabase/supabase";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,39 +21,79 @@ import {
   View,
 } from "react-native";
 
-// Valid recurrence patterns for habits
 type RecurrenceType = "daily" | "weekly" | "monthly" | "one_time" | "custom";
-
-// Days of the week: 0 = Sunday, 1 = Monday, ..., 6 = Saturday
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export default function CreateHabitScreen() {
+export default function EditHabitScreen() {
   const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme();
   const theme = Colors[colorScheme ?? "light"];
 
-  // Form state
+  // Form state - will be populated from database
   const [habitName, setHabitName] = useState("");
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>("daily");
-
-  // Weekly: which day of the week (0-6, default Monday = 1)
   const [selectedWeekday, setSelectedWeekday] = useState<number>(1);
-
-  // Custom: array of selected days (default: Monday, Wednesday, Friday)
   const [selectedCustomDays, setSelectedCustomDays] = useState<number[]>([
     1, 3, 5,
   ]);
-
-  // Monthly: which day of the month (1-31, default 1st)
   const [selectedMonthDay, setSelectedMonthDay] = useState<number>(1);
 
-  // Prevents duplicate submissions while save is in progress
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  /**
+   * Loads the existing habit data from Supabase and populates the form.
+   * Called once when the screen mounts.
+   */
+  useEffect(() => {
+    const loadHabit = async () => {
+      try {
+        if (!id) return;
+
+        const { data, error } = await supabase
+          .from("habits")
+          .select("name, recurrence_type, recurrence_days, recurrence_date")
+          .eq("id", id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (!data) {
+          Alert.alert("Habit not found");
+          router.back();
+          return;
+        }
+
+        // Populate form with existing habit data
+        setHabitName(data.name ?? "");
+        setRecurrenceType((data.recurrence_type as RecurrenceType) ?? "daily");
+
+        // Set recurrence-specific values based on the habit's type
+        if (data.recurrence_type === "weekly" && data.recurrence_days?.length) {
+          setSelectedWeekday(data.recurrence_days[0]);
+        }
+
+        if (data.recurrence_type === "custom") {
+          setSelectedCustomDays(data.recurrence_days ?? []);
+        }
+
+        if (data.recurrence_type === "monthly" && data.recurrence_date) {
+          setSelectedMonthDay(data.recurrence_date);
+        }
+      } catch (error: any) {
+        Alert.alert("Error", error?.message ?? "Could not load habit.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadHabit();
+  }, [id]);
 
   /**
    * Toggle a day in the custom days selection.
    * If the day is already selected, remove it; otherwise add it.
-   * Maintains sorted order for consistent display.
    */
   const toggleCustomDay = (dayIndex: number) => {
     if (selectedCustomDays.includes(dayIndex)) {
@@ -64,7 +105,6 @@ export default function CreateHabitScreen() {
 
   /**
    * Generate a human-readable preview of the recurrence pattern.
-   * Used to show users what they've selected before saving.
    */
   const getRecurrencePreview = () => {
     switch (recurrenceType) {
@@ -85,33 +125,30 @@ export default function CreateHabitScreen() {
   };
 
   /**
-   * Save the new habit to Supabase.
-   * Validates input, gets current user, builds recurrence data, and inserts.
+   * Returns today's date as YYYY-MM-DD for the updated_at timestamp.
    */
-  const handleSaveHabit = async () => {
+  function getLocalDateString(date = new Date()) {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, "0");
+    const day = `${date.getDate()}`.padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * Updates the habit in Supabase with the edited values.
+   */
+  const handleUpdateHabit = async () => {
     const trimmedHabit = habitName.trim();
 
-    // Validation: habit name cannot be empty
     if (!trimmedHabit) {
       Alert.alert("Missing habit", "Please enter a habit name.");
       return;
     }
 
-    // Prevent duplicate submissions
     if (busy) return;
     setBusy(true);
 
     try {
-      // Get the currently authenticated user
-      const { data, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-
-      const user = data.user;
-      if (!user) {
-        Alert.alert("Not signed in", "Please sign in again.");
-        return;
-      }
-
       // Build recurrence data based on selected type
       let recurrenceDays = null;
       let recurrenceDate = null;
@@ -127,40 +164,51 @@ export default function CreateHabitScreen() {
           recurrenceDate = selectedMonthDay;
           break;
         default:
-          // daily and one_time don't need extra recurrence data
           break;
       }
 
-      // Insert the new habit into the database
-      const { error } = await supabase.from("habits").insert({
-        user_id: user.id,
-        name: trimmedHabit,
-        recurrence_type: recurrenceType,
-        recurrence_days: recurrenceDays,
-        recurrence_date: recurrenceDate,
-      });
+      const { error } = await supabase
+        .from("habits")
+        .update({
+          name: trimmedHabit,
+          recurrence_type: recurrenceType,
+          recurrence_days: recurrenceDays,
+          recurrence_date: recurrenceDate,
+          updated_at: getLocalDateString(new Date()),
+        })
+        .eq("id", id);
 
       if (error) throw error;
 
-      // Clear form and navigate back to main screen
-      setHabitName("");
       router.replace("/(tabs)");
     } catch (error: any) {
       Alert.alert(
-        "Error saving habit",
-        error?.message ?? "Could not save habit.",
+        "Error saving changes",
+        error?.message ?? "Could not update habit.",
       );
     } finally {
       setBusy(false);
     }
   };
 
+  // Show loading state while fetching habit data
+  if (loading) {
+    return (
+      <View style={[styles.screen, { backgroundColor: theme.darkBackground }]}>
+        <View style={[styles.heroSection, { backgroundColor: theme.primary }]}>
+          <Text style={styles.title}>Edit Habit</Text>
+          <Text style={styles.subtitle}>Loading habit...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.screen, { backgroundColor: theme.darkBackground }]}>
       {/* ===== HEADER SECTION ===== */}
       <View style={[styles.heroSection, { backgroundColor: theme.primary }]}>
-        <Text style={styles.title}>Create Habit</Text>
-        <Text style={styles.subtitle}>Start building a new routine</Text>
+        <Text style={styles.title}>Edit Habit</Text>
+        <Text style={styles.subtitle}>Update your routine</Text>
       </View>
 
       {/* ===== FORM CARD ===== */}
@@ -216,7 +264,7 @@ export default function CreateHabitScreen() {
           </Pressable>
         ))}
 
-        {/* Recurrence Preview - shows what the selected pattern means */}
+        {/* Recurrence Preview */}
         <View
           style={[
             styles.previewContainer,
@@ -231,7 +279,7 @@ export default function CreateHabitScreen() {
           </Text>
         </View>
 
-        {/* Weekly Day Picker (shown only when weekly is selected) */}
+        {/* Weekly Day Picker */}
         {recurrenceType === "weekly" && (
           <View style={styles.pickerContainer}>
             <Text style={[styles.pickerLabel, { color: theme.text }]}>
@@ -265,7 +313,7 @@ export default function CreateHabitScreen() {
           </View>
         )}
 
-        {/* Custom Days Picker (shown only when custom is selected) */}
+        {/* Custom Days Picker */}
         {recurrenceType === "custom" && (
           <View style={styles.pickerContainer}>
             <Text style={[styles.pickerLabel, { color: theme.text }]}>
@@ -306,7 +354,7 @@ export default function CreateHabitScreen() {
           </View>
         )}
 
-        {/* Monthly Date Picker (shown only when monthly is selected) */}
+        {/* Monthly Date Picker */}
         {recurrenceType === "monthly" && (
           <View style={styles.pickerContainer}>
             <Text style={[styles.pickerLabel, { color: theme.text }]}>
@@ -342,20 +390,20 @@ export default function CreateHabitScreen() {
           </View>
         )}
 
-        {/* Save Button - shows ActivityIndicator while saving */}
+        {/* Update Button - shows ActivityIndicator while saving */}
         <Pressable
           style={[styles.primaryButton, { backgroundColor: theme.accent }]}
-          onPress={handleSaveHabit}
+          onPress={handleUpdateHabit}
           disabled={busy}
         >
           {busy ? (
             <ActivityIndicator size="small" color="#ffffff" />
           ) : (
-            <Text style={styles.primaryButtonText}>Save Habit</Text>
+            <Text style={styles.primaryButtonText}>Save Changes</Text>
           )}
         </Pressable>
 
-        {/* Cancel Button - returns to previous screen without saving */}
+        {/* Cancel Button */}
         <Pressable
           style={[
             styles.secondaryButton,

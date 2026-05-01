@@ -1,492 +1,403 @@
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { useState, useCallback } from 'react';
-import { useRouter, useFocusEffect } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '@/supabase/supabase';
-
 /*
-  HomeScreen
-  ----------
-  Main dashboard screen for the habit tracker.
+ * File: app/(tabs)/index.tsx
+ * Purpose: Main dashboard screen showing today's habits with a train-themed progress UI.
+ * Users can mark habits complete/incomplete, edit, delete, and navigate to create new habits.
+ */
 
-  Responsibilities:
-  1. Load the current user's habits from Supabase.
-  2. Load each habit's completion state from AsyncStorage.
-  3. Allow the user to mark a habit as completed or incomplete.
-  4. Allow the user to delete a habit.
-  5. Navigate to the habit creation screen.
+import HabitRow from "@/components/habits/HabitRow";
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTodayHabits } from "@/hooks/useTodayHabits";
+import { getDeterministicTrainAvatar } from "@/lib/avatar-utils";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { useRouter } from "expo-router";
+import { useEffect, useRef } from "react";
+import {
+  ActivityIndicator,
+  Animated,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-  Notes:
-  - Habit names are stored in Supabase so they persist across devices/accounts.
-  - Completion states are stored locally in AsyncStorage using the logged-in
-    user's ID as part of the storage key.
-*/
+// Create an animated version of Image for the train movement animation
+const AnimatedImage = Animated.createAnimatedComponent(Animated.Image);
+
 export default function HomeScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const theme = Colors[colorScheme ?? "light"];
 
-  /*
-    completed
-    ---------
-    Stores completion status by habit index.
+  // Custom hook that manages all habit data, completion status, and streak calculations
+  const {
+    loading, // Whether data is currently being fetched
+    username, // User's display name (used for train avatar)
+    todayHabits, // All habits due today
+    activeHabits, // Habits not yet completed today
+    completedHabits, // Habits already completed today
+    completedCount, // Number of completed habits
+    totalCount, // Total habits due today
+    allCompleted, // Whether all due habits are complete
+    progress, // Completion ratio (0 to 1)
+    openMenuHabitId, // Which habit's menu is currently open (null if none)
+    setOpenMenuHabitId, // Function to change which menu is open
+    toggleHabit, // Mark a habit as complete or incomplete
+    deleteHabit, // Permanently delete a habit
+    getRecurrenceText, // Convert recurrence type to human-readable string
+  } = useTodayHabits();
 
-    Example:
-    {
-      0: true,
-      1: false
-    }
+  // Get deterministic train avatar based on username (same avatar always for same user)
+  const routeAvatar = getDeterministicTrainAvatar(username);
 
-    This allows the UI to quickly determine whether each displayed habit
-    should appear completed.
-  */
-  const [completed, setCompleted] = useState<{ [key: number]: boolean }>({});
+  // Animated value for train position - moves from start (0) to end (1) based on progress
+  const trainProgress = useRef(new Animated.Value(0)).current;
 
-  /*
-    habits
-    ------
-    Stores the list of habit names loaded from the database for the
-    currently authenticated user.
-  */
-  const [habits, setHabits] = useState<string[]>([]);
-
-  /*
-    loadHabits
-    ----------
-    Retrieves the currently authenticated user, then loads that user's
-    saved habits from the Supabase "habits" table.
-
-    Habits are ordered by creation date so they appear in the same
-    sequence they were added.
-  */
-  const loadHabits = async () => {
-    try {
-      const { data } = await supabase.auth.getUser();
-      const user = data.user;
-
-      // Stop if no authenticated user is found.
-      if (!user) return;
-
-      const { data: habitsData, error } = await supabase
-        .from('habits')
-        .select('name')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      // Extract only the habit names from the returned rows.
-      const habitNames = habitsData ? habitsData.map((habit) => habit.name) : [];
-      setHabits(habitNames);
-    } catch (error) {
-      console.log('Error loading habits:', error);
-    }
-  };
-
-  /*
-    loadCompleted
-    -------------
-    Loads the local completion data for the currently authenticated user.
-
-    Each user has a unique AsyncStorage key so that one user's checked
-    habits do not affect another user's data on the same device.
-  */
-  const loadCompleted = async () => {
-    try {
-      const { data } = await supabase.auth.getUser();
-      const user = data.user;
-
-      // Stop if no authenticated user is found.
-      if (!user) return;
-
-      const completedKey = `completedHabits_${user.id}`;
-      const savedCompleted = await AsyncStorage.getItem(completedKey);
-
-      if (savedCompleted) {
-        setCompleted(JSON.parse(savedCompleted));
-      } else {
-        setCompleted({});
-      }
-    } catch (error) {
-      console.log('Error loading completed habits:', error);
-    }
-  };
-
-  /*
-    useFocusEffect
-    --------------
-    Reloads habits and completion states whenever this screen comes into focus.
-
-    This is useful because the user may navigate away to create a new habit
-    and then return to this screen. When they come back, the latest data
-    should be displayed immediately.
-  */
-  useFocusEffect(
-    useCallback(() => {
-      loadHabits();
-      loadCompleted();
-    }, [])
-  );
-
-  /*
-    toggleHabit
-    -----------
-    Toggles the completion state for a habit at the given index.
-
-    Steps:
-    1. Get the currently authenticated user.
-    2. Build that user's AsyncStorage key.
-    3. Flip the selected habit's completion value.
-    4. Save the updated completion object back to AsyncStorage.
-    5. Update local React state so the UI refreshes.
-  */
-  const toggleHabit = async (index: number) => {
-    const { data } = await supabase.auth.getUser();
-    const user = data.user;
-
-    if (!user) return;
-
-    const completedKey = `completedHabits_${user.id}`;
-
-    setCompleted((prev) => {
-      const updated = {
-        ...prev,
-        [index]: !prev[index],
-      };
-
-      AsyncStorage.setItem(completedKey, JSON.stringify(updated));
-
-      return updated;
-    });
-  };
-
-  /*
-    deleteHabit
-    -----------
-    Deletes a habit from Supabase for the current user, then updates the
-    local habit list and local completion tracking.
-
-    Why the completion object must be rebuilt:
-    - Completion states are stored by index.
-    - After deleting one habit, the indexes of the habits after it shift down.
-    - The completion object must be adjusted so each remaining habit keeps
-      the correct checked/unchecked state.
-  */
-  const deleteHabit = async (habitName: string, index: number) => {
-    try {
-      const { data } = await supabase.auth.getUser();
-      const user = data.user;
-
-      if (!user) return;
-
-      const { error } = await supabase
-        .from('habits')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('name', habitName);
-
-      if (error) throw error;
-
-      const completedKey = `completedHabits_${user.id}`;
-
-      // Remove the deleted habit from the visible habit list.
-      setHabits((prev) => prev.filter((_, i) => i !== index));
-
-      /*
-        Rebuild completion state after deletion.
-
-        Example:
-        If habit at index 1 is deleted, old index 2 becomes new index 1.
-      */
-      setCompleted((prev) => {
-        const updated: { [key: number]: boolean } = {};
-
-        Object.keys(prev).forEach((key) => {
-          const oldIndex = Number(key);
-
-          if (oldIndex < index) {
-            updated[oldIndex] = prev[oldIndex];
-          } else if (oldIndex > index) {
-            updated[oldIndex - 1] = prev[oldIndex];
-          }
-        });
-
-        AsyncStorage.setItem(completedKey, JSON.stringify(updated));
-        return updated;
-      });
-    } catch (error) {
-      console.log('Delete error:', error);
-    }
-  };
+  // Animate train when progress changes (e.g., when user marks a habit complete)
+  useEffect(() => {
+    Animated.timing(trainProgress, {
+      toValue: progress,
+      duration: 450, // Smooth 450ms movement
+      useNativeDriver: false, // False because we're animating "left" which is not a transform
+    }).start();
+  }, [progress, trainProgress]);
 
   return (
     <View style={styles.screen}>
-      {/* Top section reserved for future train/progress visualization UI */}
-      <View style={styles.topSection}>
-        <Text style={styles.placeholderText}>Train / Progress UI here</Text>
+      {/* ===== TOP SECTION: Train Route Progress ===== */}
+      <View style={[styles.topSection, { backgroundColor: theme.primary }]}>
+        <Text style={styles.progressTitle}>Today&apos;s Route</Text>
+        <Text style={styles.completionText}>
+          {completedCount} / {totalCount} stops completed
+        </Text>
+
+        <View style={styles.railContainer}>
+          {/* Background track - always visible */}
+          <View style={styles.trackBase}>
+            <View
+              style={[
+                styles.trackProgress,
+                { width: `${progress * 100}%`, backgroundColor: theme.success },
+              ]}
+            />
+          </View>
+
+          {/* Station markers - one for each habit, positioned along the track */}
+          {todayHabits.map((habit, index) => {
+            // Calculate percentage position for this station
+            // trackStart = 11% (left edge), trackEnd = 86% (right edge)
+            const trackStart = 11;
+            const trackEnd = 86;
+            const usableTrack = trackEnd - trackStart;
+            const stationLeft: `${number}%` =
+              totalCount <= 1
+                ? `${trackStart}%`
+                : `${trackStart + (index / (totalCount - 1)) * usableTrack}%`;
+
+            return (
+              <View
+                key={habit.id}
+                style={[styles.stationWrap, { left: stationLeft }]}
+              >
+                <MaterialCommunityIcons
+                  name="storefront"
+                  size={18}
+                  color={
+                    habit.completed_today ? theme.cardBackground : theme.success
+                  }
+                />
+              </View>
+            );
+          })}
+
+          {/* Animated train that moves from left to right as progress increases */}
+          <AnimatedImage
+            source={routeAvatar}
+            style={[
+              styles.trainImage,
+              {
+                left: trainProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ["-4%" as const, "80%" as const],
+                }),
+              },
+            ]}
+          />
+        </View>
       </View>
 
+      {/* ===== MAIN CONTENT SCROLL AREA ===== */}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.trackerCard}>
-          {/* Card title */}
+        {/* ===== TODAY'S HABITS CARD ===== */}
+        <View
+          style={[
+            styles.trackerCard,
+            { backgroundColor: theme.cardBackground },
+          ]}
+        >
           <View style={styles.trackerHeaderWrapper}>
-            <View style={styles.trackerPill}>
-              <Text style={styles.trackerPillText}>Daily Tracker</Text>
+            <View
+              style={[styles.trackerPill, { backgroundColor: theme.accent }]}
+            >
+              <Text style={styles.trackerPillText}>Today&apos;s Track</Text>
             </View>
           </View>
 
-          {/* Empty state shown when no habits exist yet */}
-          {habits.length === 0 && (
-            <View style={styles.emptyStateBox}>
-              <Text style={styles.emptyStateText}>
-                No habits yet. Add your first habit below.
+          {/* Loading state */}
+          {loading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.accent} />
+              <Text style={[styles.loadingText, { color: theme.text }]}>
+                Loading habits...
               </Text>
             </View>
           )}
 
-          {/* Habit list */}
-          {habits.map((habit, index) => {
-            const isDone = completed[index];
-
-            return (
-              <Pressable
-                key={`${habit}-${index}`}
-                style={[styles.habitRow, isDone && styles.habitRowDone]}
-                onPress={() => toggleHabit(index)}
-              >
-                {/* Left side: status dot + habit name */}
-                <View style={styles.habitLeft}>
-                  <View style={[styles.smallDot, isDone && styles.smallDotDone]} />
-                  <Text style={[styles.habitLabel, isDone && styles.habitLabelDone]}>
-                    {habit}
-                  </Text>
-                </View>
-
-                {/* Right side: completion icon + delete button */}
-                <View style={styles.habitActions}>
-                  <View style={[styles.checkCircle, isDone && styles.checkCircleDone]}>
-                    <Text style={styles.checkMark}>{isDone ? '✓' : ''}</Text>
-                  </View>
-
-                  <Pressable
-                    onPress={() => deleteHabit(habit, index)}
-                    style={styles.deleteBox}
-                  >
-                    <Text style={styles.deleteText}>✕</Text>
-                  </Pressable>
-                </View>
-              </Pressable>
-            );
-          })}
-
-          {/* Navigation row to open the habit creation screen */}
-          <Pressable
-            style={styles.addHabitRow}
-            onPress={() => router.push('/create')}
-          >
-            <Text style={styles.addHabitText}>Write a new habbit</Text>
-            <View style={styles.plusBox}>
-              <Text style={styles.plusText}>+</Text>
+          {/* Empty state - no habits due today */}
+          {!loading && todayHabits.length === 0 && (
+            <View
+              style={[
+                styles.emptyStateBox,
+                { backgroundColor: theme.stationMarker },
+              ]}
+            >
+              <Text style={styles.emptyStateText}>
+                No habits due today. Add a habit to start your route.
+              </Text>
             </View>
-          </Pressable>
+          )}
+
+          {/* Congratulations message when all habits are complete */}
+          {!loading && allCompleted && (
+            <View
+              style={[
+                styles.congratsBox,
+                { backgroundColor: theme.success + "90" },
+              ]}
+            >
+              <Text style={styles.congratsText}>Congrats on a good run!</Text>
+            </View>
+          )}
+
+          {/* List of habits not yet completed */}
+          <View style={styles.titleContentGap}>
+            {!loading &&
+              activeHabits.map((habit) => (
+                <HabitRow
+                  key={habit.id}
+                  habit={habit}
+                  completed={false}
+                  menuOpen={openMenuHabitId === habit.id}
+                  onToggle={() => toggleHabit(habit)}
+                  onToggleMenu={() =>
+                    setOpenMenuHabitId((prev) =>
+                      prev === habit.id ? null : habit.id,
+                    )
+                  }
+                  onEdit={() => {
+                    setOpenMenuHabitId(null);
+                    router.push({
+                      pathname: "/edit/[id]",
+                      params: { id: habit.id },
+                    });
+                  }}
+                  onDelete={() => {
+                    setOpenMenuHabitId(null);
+                    deleteHabit(habit);
+                  }}
+                  getRecurrenceText={getRecurrenceText}
+                />
+              ))}
+          </View>
         </View>
+
+        {/* ===== COMPLETED HABITS SECTION (collapsible, only shows if any exist) ===== */}
+        {!loading && completedHabits.length > 0 && (
+          <View
+            style={[
+              styles.completedCard,
+              { backgroundColor: theme.cardBackground },
+            ]}
+          >
+            <View style={styles.completedHeaderWrapper}>
+              <View
+                style={[
+                  styles.completedHeaderPill,
+                  { backgroundColor: theme.mutedText },
+                ]}
+              >
+                <Text style={styles.completedHeaderText}>
+                  Completed Transit
+                </Text>
+              </View>
+            </View>
+            <View style={styles.sectionInset}>
+              {completedHabits.map((habit) => (
+                <HabitRow
+                  key={habit.id}
+                  habit={habit}
+                  completed={true}
+                  menuOpen={openMenuHabitId === habit.id}
+                  onToggle={() => toggleHabit(habit)}
+                  onToggleMenu={() =>
+                    setOpenMenuHabitId((prev) =>
+                      prev === habit.id ? null : habit.id,
+                    )
+                  }
+                  onEdit={() => {
+                    setOpenMenuHabitId(null);
+                    router.push({
+                      pathname: "/edit/[id]",
+                      params: { id: habit.id },
+                    });
+                  }}
+                  onDelete={() => {
+                    setOpenMenuHabitId(null);
+                    deleteHabit(habit);
+                  }}
+                  getRecurrenceText={getRecurrenceText}
+                />
+              ))}
+            </View>
+          </View>
+        )}
       </ScrollView>
+
+      {/* ===== FLOATING ACTION BUTTON (FAB) ===== */}
+      {/* Pressing this navigates to the habit creation screen */}
+      <Pressable
+        style={[styles.fab, { backgroundColor: theme.warning }]}
+        onPress={() => router.push("/create")}
+      >
+        <Text style={styles.fabText}>+</Text>
+      </Pressable>
     </View>
   );
 }
 
-/*
-  Styles
-  ------
-  Defines the visual appearance of the HomeScreen, including layout,
-  colors, spacing, and the completed/uncompleted habit states.
-*/
+// ===== STYLES =====
+// Note: Some colors remain hardcoded where they are design-specific and not theme-dependent
+// (e.g., white text on dark backgrounds, black text on light backgrounds)
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-
+  screen: { flex: 1, backgroundColor: "#000000" },
   topSection: {
-    height: '45%',
-    backgroundColor: '#6f92d6',
-    justifyContent: 'center',
-    alignItems: 'center',
+    height: "30%",
+    justifyContent: "center",
+    alignItems: "center",
   },
-
-  placeholderText: {
-    color: '#ffffff',
-    fontSize: 18,
+  progressTitle: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "800",
   },
-
-  scrollContent: {
-    paddingBottom: 100,
-    backgroundColor: '#000000',
+  completionText: {
+    color: "#d6ead8",
+    marginBottom: 8,
   },
-
+  railContainer: {
+    width: "88%",
+    height: 40,
+    position: "relative",
+  },
+  trackBase: {
+    height: 12,
+    backgroundColor: "#2d2d2d",
+    borderRadius: 6,
+    position: "absolute",
+    top: 38,
+    width: "100%",
+  },
+  trackProgress: {
+    height: "100%",
+    borderRadius: 6,
+  },
+  stationWrap: {
+    position: "absolute",
+    top: 22,
+    alignItems: "center",
+  },
+  titleContentGap: {
+    marginTop: 10,
+  },
+  sectionInset: {
+    backgroundColor: "rgba(0,0,0,0.08)",
+    borderRadius: 7,
+    padding: 5,
+    marginTop: 7,
+  },
+  trainImage: {
+    position: "absolute",
+    top: 2,
+    width: 70,
+    height: 70,
+    resizeMode: "contain",
+  },
+  scrollContent: { paddingBottom: 100 },
   trackerCard: {
-    backgroundColor: '#5a5a5a',
-    marginHorizontal: 18,
-    marginTop: 20,
+    margin: 18,
     borderRadius: 20,
     padding: 16,
   },
-
   trackerHeaderWrapper: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: -30,
-    marginBottom: 10,
   },
-
   trackerPill: {
-    backgroundColor: '#4d77ad',
-    borderRadius: 20,
+    paddingHorizontal: 40,
     paddingVertical: 6,
-    paddingHorizontal: 50,
-  },
-
-  trackerPillText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-
-  emptyStateBox: {
-    backgroundColor: '#f6e6c5',
-    borderRadius: 14,
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: '#222222',
-    borderStyle: 'dashed',
-  },
-
-  emptyStateText: {
-    color: '#111111',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-
-  habitRow: {
-    backgroundColor: '#f7f7f7',
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#161616',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  habitRowDone: {
-    backgroundColor: '#eef8df',
-  },
-
-  habitLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-
-  smallDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#b8b8b8',
-    marginRight: 12,
-  },
-
-  smallDotDone: {
-    backgroundColor: '#79bd00',
-  },
-
-  habitLabel: {
-    fontSize: 18,
-    color: '#111',
-  },
-
-  habitLabelDone: {
-    textDecorationLine: 'line-through',
-    color: '#6e6e6e',
-  },
-
-  habitActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-
-  checkCircle: {
-    width: 40,
-    height: 40,
     borderRadius: 20,
-    backgroundColor: '#d9d9d9',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-
-  checkCircleDone: {
-    backgroundColor: '#79bd00',
+  trackerPillText: { color: "#fff" },
+  loadingContainer: { alignItems: "center", padding: 20 },
+  loadingText: {
+    marginTop: 12,
   },
-
-  checkMark: {
-    color: '#ffffff',
-    fontSize: 22,
-    fontWeight: '800',
-  },
-
-  deleteBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#ff6b6b',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  deleteText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-
-  addHabitRow: {
-    backgroundColor: '#f6e6c5',
+  emptyStateBox: {
+    padding: 16,
     borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#222',
-    borderStyle: 'dashed',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginTop: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
   },
-
-  addHabitText: {
-    fontSize: 17,
-    color: '#111',
+  emptyStateText: { textAlign: "center", color: "#111111" },
+  congratsBox: {
+    padding: 16,
+    top: 10,
+    borderRadius: 14,
   },
-
-  plusBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    backgroundColor: '#f6c15b',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#7a5a16',
+  congratsText: { textAlign: "center", fontWeight: "800", color: "#111111" },
+  completedCard: {
+    margin: 18,
+    borderRadius: 20,
+    padding: 16,
   },
-
-  plusText: {
-    fontSize: 26,
-    color: '#5b3e00',
-    fontWeight: '700',
+  completedHeaderWrapper: { alignItems: "center", marginTop: -30 },
+  completedHeaderPill: {
+    borderRadius: 20,
+    paddingHorizontal: 30,
+    paddingVertical: 6,
+  },
+  completedHeaderText: { color: "#fff" },
+  fab: {
+    position: "absolute",
+    bottom: 28,
+    right: 22,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: "center",
+    alignItems: "center",
+    // Shadow for elevation on iOS and Android
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  fabText: {
+    fontSize: 34,
+    fontWeight: "800",
+    color: "#5b3e00",
   },
 });
