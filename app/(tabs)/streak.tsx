@@ -1,284 +1,184 @@
-import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
-
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { supabase } from "@/supabase/supabase";
-
 /*
-  Streak Screen
-  -------------
-  Displays the user's daily progress and streak information.
+ * File: app/(tabs)/streak.tsx
+ * Purpose: Displays streak statistics for all user habits.
+ * Shows each habit's current streak and all-time longest streak,
+ * sorted by longest streak descending.
+ */
 
-  Responsibilities:
-  1. Load the user's habits from Supabase.
-  2. Load completion status from AsyncStorage.
-  3. Calculate:
-     - Number of completed habits
-     - Remaining habits
-     - Overall completion percentage
-  4. Display a summary dashboard of progress.
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useStreaks } from "@/hooks/useStreaks";
+import { useFocusEffect } from "expo-router";
+import { useCallback } from "react";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-  Notes:
-  - Habit names are stored in Supabase (persistent).
-  - Completion states are stored locally per user using AsyncStorage.
-*/
-type Habit = {
-  id: string;
-  name: string;
-};
+export default function StreakScreen() {
+  const colorScheme = useColorScheme();
+  const theme = Colors[colorScheme ?? "light"];
 
-export default function Streak() {
-  /*
-    completed
-    ---------
-    Tracks completion state of habits by index.
+  // Custom hook that manages all streak data and real-time updates
+  const { loading, habitStreaks, topLongest, refresh } = useStreaks();
 
-    Example:
-    { 0: true, 1: false }
-  */
-  const [completedTodayIds, setCompletedTodayIds] = useState<string[]>([]);
-
-  /*
-    habits
-    ------
-    Stores the list of habit names retrieved from Supabase.
-  */
-  const [habits, setHabits] = useState<Habit[]>([]);
-
-  /*
-    loadHabits
-    ----------
-    Retrieves the current user's habits from the Supabase database.
-    Habits are ordered by creation date to maintain consistency.
-  */
-  const loadHabits = async () => {
-    try {
-      const { data: authData, error: authError } =
-        await supabase.auth.getUser();
-
-      if (authError) throw authError;
-      if (!authData.user) return;
-
-      const userId = authData.user.id;
-      const today = new Date().toISOString().split("T")[0];
-
-      const { data: habitsData, error: habitsError } = await supabase
-        .from("habits")
-        .select("id, name")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: true });
-
-      if (habitsError) throw habitsError;
-
-      const { data: completionsData, error: completionsError } = await supabase
-        .from("habit_completions")
-        .select("habit_id")
-        .eq("user_id", userId)
-        .eq("completion_date", today);
-
-      if (completionsError) throw completionsError;
-
-      setHabits(habitsData ?? []);
-      setCompletedTodayIds(
-        (completionsData ?? []).map((item) => item.habit_id),
-      );
-    } catch (error) {
-      console.log("Error loading streak data:", error);
-    }
-  };
-
-  /*
-    useFocusEffect
-    --------------
-    Reloads habits and completion data whenever the screen
-    becomes active. Ensures the displayed data is always up to date.
-  */
+  // Refresh data whenever the screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      loadHabits();
-    }, []),
+      refresh();
+    }, [refresh]),
   );
 
-  /*
-    Derived Values
-    --------------
-    These values are computed from the habits and completion state:
-
-    completedCount  → number of completed habits
-    remainingCount  → number of incomplete habits
-    progressPercent → percentage of completion
-    streakNumber    → current streak (temporary logic based on completed count)
-  */
-  const completedCount = habits.filter((habit) =>
-    completedTodayIds.includes(habit.id),
-  ).length;
-
-  const remainingCount = habits.length - completedCount;
-  const progressPercent =
-    habits.length > 0 ? Math.round((completedCount / habits.length) * 100) : 0;
-
-  const streakNumber = completedCount;
-
   return (
-    <ThemedView style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: theme.darkBackground }]}>
+      {/* ===== HEADER SECTION ===== */}
+      <View style={[styles.heroSection, { backgroundColor: theme.primary }]}>
+        <Text style={styles.title}>Longest Streaks</Text>
+        <Text style={styles.subtitle}>Your strongest habit routes</Text>
+
+        {/* Summary card showing the top streak across all habits */}
+        <View
+          style={[
+            styles.summaryCard,
+            {
+              backgroundColor: theme.cardBackground,
+              borderColor: theme.accent,
+            },
+          ]}
+        >
+          <Text style={styles.summaryNumber}>{topLongest}</Text>
+          <Text style={styles.summaryLabel}>Top longest streak</Text>
+        </View>
+      </View>
+
+      {/* ===== STREAK LIST ===== */}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Page Title */}
-        <ThemedText type="title" style={styles.pageTitle}>
-          Streak &amp; Progress
-        </ThemedText>
+        <View
+          style={[styles.listCard, { backgroundColor: theme.cardBackground }]}
+        >
+          {/* Loading state */}
+          {loading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.accent} />
+              <Text style={[styles.loadingText, { color: theme.text }]}>
+                Loading streaks...
+              </Text>
+            </View>
+          )}
 
-        {/* Streak Display */}
-        <View style={styles.streakBadgeCard}>
-          <ThemedText style={styles.streakNumber}>{streakNumber}</ThemedText>
-          <ThemedText style={styles.streakLabel}>Current Streak</ThemedText>
+          {/* Empty state - no habits exist yet */}
+          {!loading && habitStreaks.length === 0 && (
+            <View
+              style={[
+                styles.emptyCard,
+                { backgroundColor: theme.stationMarker },
+              ]}
+            >
+              <Text style={styles.emptyText}>
+                No habits yet. Add habits on the home page to start building
+                streaks.
+              </Text>
+            </View>
+          )}
+
+          {/* List of habits with their streak data */}
+          {!loading &&
+            habitStreaks.map((habit) => (
+              <View
+                key={habit.id}
+                style={[
+                  styles.habitRow,
+                  { backgroundColor: theme.lightBackground },
+                ]}
+              >
+                {/* Left side: habit name and current streak */}
+                <View style={styles.habitInfo}>
+                  <Text style={[styles.habitName, { color: theme.text }]}>
+                    {habit.name}
+                  </Text>
+                  <Text style={[styles.habitMeta, { color: theme.mutedText }]}>
+                    Current streak: {habit.currentStreak} day
+                    {habit.currentStreak === 1 ? "" : "s"}
+                  </Text>
+                </View>
+
+                {/* Right side: longest streak record */}
+                <View style={styles.longestNumber}>
+                  <Text style={[styles.habitMeta, { color: theme.mutedText }]}>
+                    Record
+                  </Text>
+                  <Text style={[styles.longestNumber, { color: theme.text }]}>
+                    {habit.longestStreak}
+                  </Text>
+                </View>
+              </View>
+            ))}
         </View>
-
-        {/* Stats Summary Row */}
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <ThemedText style={styles.statNumber}>{completedCount}</ThemedText>
-            <ThemedText style={styles.statLabel}>Done</ThemedText>
-          </View>
-
-          <View style={styles.statCard}>
-            <ThemedText style={styles.statNumber}>{remainingCount}</ThemedText>
-            <ThemedText style={styles.statLabel}>Left</ThemedText>
-          </View>
-
-          <View style={styles.statCard}>
-            <ThemedText style={styles.statNumber}>
-              {progressPercent}%
-            </ThemedText>
-            <ThemedText style={styles.statLabel}>Progress</ThemedText>
-          </View>
-        </View>
-
-        {/* Daily Summary */}
-        <View style={styles.infoCard}>
-          <ThemedText style={styles.infoTitle}>Today&apos;s Summary</ThemedText>
-          <ThemedText style={styles.infoText}>
-            You have completed {completedCount} out of {habits.length} habits
-            today.
-          </ThemedText>
-        </View>
-
-        {/* Empty State */}
-        {habits.length === 0 && (
-          <View style={styles.emptyCard}>
-            <ThemedText style={styles.emptyText}>
-              No habits yet. Add some habits on the home page to start building
-              your streak.
-            </ThemedText>
-          </View>
-        )}
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }
 
-/*
-  Styles
-  ------
-  Defines layout, spacing, colors, and visual styling for the Streak screen.
-*/
+// ===== STYLES =====
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#6f92d6",
   },
-
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 20,
-    paddingBottom: 100,
-  },
-
-  pageTitle: {
-    color: "#ffffff",
-    marginBottom: 20,
-    textAlign: "center",
-  },
-
-  streakBadgeCard: {
-    backgroundColor: "#7b7878",
-    borderRadius: 20,
-    paddingVertical: 24,
+  heroSection: {
+    paddingTop: 64,
+    paddingBottom: 28,
     paddingHorizontal: 20,
-    alignItems: "center",
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#1b4623",
   },
-
-  streakNumber: {
+  title: {
+    color: "#ffffff",
     fontSize: 32,
     fontWeight: "800",
-    color: "#ffffff",
-    marginBottom: 4,
+    marginBottom: 6,
   },
-
-  streakLabel: {
-    fontSize: 16,
-    color: "#d4e7d6",
-  },
-
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  subtitle: {
+    color: "#d6ead8",
+    fontSize: 15,
     marginBottom: 20,
   },
-
-  statCard: {
-    backgroundColor: "#1c0caf",
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 10,
-    width: "31%",
+  summaryCard: {
+    borderRadius: 20,
+    paddingVertical: 22,
+    paddingHorizontal: 20,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#2d2d2d",
+    borderWidth: 2,
   },
-
-  statNumber: {
-    fontSize: 22,
-    fontWeight: "800",
+  summaryNumber: {
     color: "#ffffff",
+    fontSize: 34,
+    fontWeight: "800",
     marginBottom: 4,
   },
-
-  statLabel: {
-    fontSize: 13,
-    color: "#cfcfcf",
+  summaryLabel: {
+    color: "#d6ead8",
+    fontSize: 14,
   },
-
-  infoCard: {
-    backgroundColor: "#7b7878",
-    borderRadius: 18,
+  scrollContent: {
     padding: 18,
-    marginBottom: 18,
+    paddingBottom: 110,
   },
-
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#ffffff",
-    marginBottom: 8,
+  listCard: {
+    borderRadius: 20,
+    padding: 16,
   },
-
-  infoText: {
-    fontSize: 15,
-    color: "#f3f3f3",
-    lineHeight: 22,
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: "center",
   },
-
+  loadingText: {
+    marginTop: 12,
+  },
   emptyCard: {
-    backgroundColor: "#f6e6c5",
     borderRadius: 14,
     borderWidth: 2,
     borderColor: "#222",
@@ -286,11 +186,38 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 16,
   },
-
   emptyText: {
     fontSize: 15,
     color: "#111111",
     textAlign: "center",
     lineHeight: 22,
+  },
+  habitRow: {
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "#161616",
+    paddingVertical: 16,
+    paddingLeft: 20,
+    paddingRight: 25,
+    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  habitInfo: {
+    flex: 1,
+  },
+  habitName: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  habitMeta: {
+    fontSize: 13,
+  },
+  longestNumber: {
+    fontSize: 20,
+    fontWeight: "800",
+    marginLeft: 12,
   },
 });
