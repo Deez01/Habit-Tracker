@@ -164,173 +164,101 @@ export default function CreateHabitScreen() {
       </View>
 
       {/* ===== FORM CARD ===== */}
-      <View
-        style={[styles.formCard, { backgroundColor: theme.cardBackground }]}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Habit Name Input */}
-        <Text style={[styles.label, { color: theme.text }]}>Habit Name</Text>
-        <TextInput
-          value={habitName}
-          onChangeText={setHabitName}
-          placeholder="Enter a habit..."
-          placeholderTextColor={theme.placeholderText}
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.lightBackground,
-              borderColor: theme.cardBorder,
-              color: theme.text,
-            },
-          ]}
-        />
-
-        {/* Recurrence Type Selector */}
-        <Text style={[styles.label, { color: theme.text }]}>How often?</Text>
-        {[
-          { type: "daily", label: "Daily" },
-          { type: "weekly", label: "Weekly (specific day)" },
-          { type: "monthly", label: "Monthly (specific date)" },
-          { type: "one_time", label: "One time only" },
-          { type: "custom", label: "Custom (select days)" },
-        ].map((option) => (
-          <Pressable
-            key={option.type}
+        <View
+          style={[styles.formCard, { backgroundColor: theme.cardBackground }]}
+        >
+          {/* Habit Name Input */}
+          <Text style={[styles.label, { color: theme.text }]}>Habit Name</Text>
+          <TextInput
+            value={habitName}
+            onChangeText={setHabitName}
+            placeholder="Enter a habit..."
+            placeholderTextColor={theme.placeholderText}
             style={[
-              styles.recurrenceOption,
-              { backgroundColor: theme.cardBorder },
-              recurrenceType === option.type && {
-                backgroundColor: theme.accent,
+              styles.input,
+              {
+                backgroundColor: theme.lightBackground,
+                borderColor: theme.cardBorder,
+                color: theme.text,
               },
             ]}
-            onPress={() => setRecurrenceType(option.type as RecurrenceType)}
-          >
-            <Text
+          />
+
+          {/* Recurrence Type Selector */}
+          <Text style={[styles.label, { color: theme.text }]}>How often?</Text>
+          {[
+            { type: "daily", label: "Daily" },
+            { type: "weekly", label: "Weekly (specific day)" },
+            { type: "monthly", label: "Monthly (specific date)" },
+            { type: "one_time", label: "One time only" },
+            { type: "custom", label: "Custom (select days)" },
+          ].map((option) => (
+            <Pressable
+              key={option.type}
               style={[
-                styles.recurrenceText,
-                { color: theme.text },
-                recurrenceType === option.type && { fontWeight: "600" },
+                styles.recurrenceOption,
+                { backgroundColor: theme.cardBorder },
+                recurrenceType === option.type && {
+                  backgroundColor: theme.accent,
+                },
               ]}
+              onPress={() => setRecurrenceType(option.type as RecurrenceType)}
             >
-              {option.label}
-            </Text>
-          </Pressable>
-        ))}
-
-        {/* Recurrence Preview - shows what the selected pattern means */}
-        <View
-          style={[
-            styles.previewContainer,
-            { backgroundColor: theme.cardBorder },
-          ]}
-        >
-          <Text style={[styles.previewLabel, { color: theme.mutedText }]}>
-            Preview:
-          </Text>
-          <Text style={[styles.previewText, { color: theme.text }]}>
-            {getRecurrencePreview()}
-          </Text>
-        </View>
-
-        {/* Weekly Day Picker (shown only when weekly is selected) */}
-        {recurrenceType === "weekly" && (
-          <View style={styles.pickerContainer}>
-            <Text style={[styles.pickerLabel, { color: theme.text }]}>
-              Select day:
-            </Text>
-            <View style={styles.weekdayRow}>
-              {WEEKDAYS.map((day, index) => (
-                <Pressable
-                  key={day}
-                  style={[
-                    styles.weekdayButton,
-                    { backgroundColor: theme.cardBorder },
-                    selectedWeekday === index && {
-                      backgroundColor: theme.success,
-                    },
-                  ]}
-                  onPress={() => setSelectedWeekday(index)}
-                >
-                  <Text
-                    style={[
-                      styles.weekdayText,
-                      { color: theme.text },
-                      selectedWeekday === index && { fontWeight: "700" },
-                    ]}
-                  >
-                    {day}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Custom Days Picker (shown only when custom is selected) */}
-        {recurrenceType === "custom" && (
-          <View style={styles.pickerContainer}>
-            <Text style={[styles.pickerLabel, { color: theme.text }]}>
-              Select days:
-            </Text>
-            <View style={styles.weekdayRow}>
-              {WEEKDAYS.map((day, index) => (
-                <Pressable
-                  key={day}
-                  style={[
-                    styles.weekdayButton,
-                    { backgroundColor: theme.cardBorder },
-                    selectedCustomDays.includes(index) && {
-                      backgroundColor: theme.success,
-                    },
-                  ]}
-                  onPress={() => toggleCustomDay(index)}
-                >
-                  <Text
-                    style={[
-                      styles.weekdayText,
-                      { color: theme.text },
-                      selectedCustomDays.includes(index) && {
-                        fontWeight: "700",
-                      },
-                    ]}
-                  >
-                    {day}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            {selectedCustomDays.length === 0 && (
-              <Text style={[styles.warningText, { color: theme.warning }]}>
-                Select at least one day
+              <Text
+                style={[
+                  styles.recurrenceText,
+                  { color: theme.text },
+                  recurrenceType === option.type && { fontWeight: "600" },
+                ]}
+              >
+                {option.label}
               </Text>
-            )}
-          </View>
-        )}
+            </Pressable>
+          ))}
 
-        {/* Monthly Date Picker (shown only when monthly is selected) */}
-        {recurrenceType === "monthly" && (
-          <View style={styles.pickerContainer}>
-            <Text style={[styles.pickerLabel, { color: theme.text }]}>
-              Select day of month:
+          {/* Recurrence Preview - shows what the selected pattern means */}
+          <View
+            style={[
+              styles.previewContainer,
+              { backgroundColor: theme.cardBorder },
+            ]}
+          >
+            <Text style={[styles.previewLabel, { color: theme.mutedText }]}>
+              Preview:
             </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.monthDayRow}>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+            <Text style={[styles.previewText, { color: theme.text }]}>
+              {getRecurrencePreview()}
+            </Text>
+          </View>
+
+          {/* Weekly Day Picker (shown only when weekly is selected) */}
+          {recurrenceType === "weekly" && (
+            <View style={styles.pickerContainer}>
+              <Text style={[styles.pickerLabel, { color: theme.text }]}>
+                Select day:
+              </Text>
+              <View style={styles.weekdayRow}>
+                {WEEKDAYS.map((day, index) => (
                   <Pressable
                     key={day}
                     style={[
-                      styles.monthDayButton,
+                      styles.weekdayButton,
                       { backgroundColor: theme.cardBorder },
-                      selectedMonthDay === day && {
+                      selectedWeekday === index && {
                         backgroundColor: theme.success,
                       },
                     ]}
-                    onPress={() => setSelectedMonthDay(day)}
+                    onPress={() => setSelectedWeekday(index)}
                   >
                     <Text
                       style={[
-                        styles.monthDayText,
+                        styles.weekdayText,
                         { color: theme.text },
-                        selectedMonthDay === day && { fontWeight: "700" },
+                        selectedWeekday === index && { fontWeight: "700" },
                       ]}
                     >
                       {day}
@@ -338,35 +266,112 @@ export default function CreateHabitScreen() {
                   </Pressable>
                 ))}
               </View>
-            </ScrollView>
-          </View>
-        )}
-
-        {/* Save Button - shows ActivityIndicator while saving */}
-        <Pressable
-          style={[styles.primaryButton, { backgroundColor: theme.accent }]}
-          onPress={handleSaveHabit}
-          disabled={busy}
-        >
-          {busy ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <Text style={styles.primaryButtonText}>Save Habit</Text>
+            </View>
           )}
-        </Pressable>
 
-        {/* Cancel Button - returns to previous screen without saving */}
-        <Pressable
-          style={[
-            styles.secondaryButton,
-            { backgroundColor: theme.stationMarker },
-          ]}
-          onPress={() => router.back()}
-          disabled={busy}
-        >
-          <Text style={styles.secondaryButtonText}>Cancel</Text>
-        </Pressable>
-      </View>
+          {/* Custom Days Picker (shown only when custom is selected) */}
+          {recurrenceType === "custom" && (
+            <View style={styles.pickerContainer}>
+              <Text style={[styles.pickerLabel, { color: theme.text }]}>
+                Select days:
+              </Text>
+              <View style={styles.weekdayRow}>
+                {WEEKDAYS.map((day, index) => (
+                  <Pressable
+                    key={day}
+                    style={[
+                      styles.weekdayButton,
+                      { backgroundColor: theme.cardBorder },
+                      selectedCustomDays.includes(index) && {
+                        backgroundColor: theme.success,
+                      },
+                    ]}
+                    onPress={() => toggleCustomDay(index)}
+                  >
+                    <Text
+                      style={[
+                        styles.weekdayText,
+                        { color: theme.text },
+                        selectedCustomDays.includes(index) && {
+                          fontWeight: "700",
+                        },
+                      ]}
+                    >
+                      {day}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              {selectedCustomDays.length === 0 && (
+                <Text style={[styles.warningText, { color: theme.warning }]}>
+                  Select at least one day
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* Monthly Date Picker (shown only when monthly is selected) */}
+          {recurrenceType === "monthly" && (
+            <View style={styles.pickerContainer}>
+              <Text style={[styles.pickerLabel, { color: theme.text }]}>
+                Select day of month:
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.monthDayRow}>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                    <Pressable
+                      key={day}
+                      style={[
+                        styles.monthDayButton,
+                        { backgroundColor: theme.cardBorder },
+                        selectedMonthDay === day && {
+                          backgroundColor: theme.success,
+                        },
+                      ]}
+                      onPress={() => setSelectedMonthDay(day)}
+                    >
+                      <Text
+                        style={[
+                          styles.monthDayText,
+                          { color: theme.text },
+                          selectedMonthDay === day && { fontWeight: "700" },
+                        ]}
+                      >
+                        {day}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Save Button - shows ActivityIndicator while saving */}
+          <Pressable
+            style={[styles.primaryButton, { backgroundColor: theme.accent }]}
+            onPress={handleSaveHabit}
+            disabled={busy}
+          >
+            {busy ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Save Habit</Text>
+            )}
+          </Pressable>
+
+          {/* Cancel Button - returns to previous screen without saving */}
+          <Pressable
+            style={[
+              styles.secondaryButton,
+              { backgroundColor: theme.stationMarker },
+            ]}
+            onPress={() => router.back()}
+            disabled={busy}
+          >
+            <Text style={styles.secondaryButtonText}>Cancel</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -497,4 +502,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
+  scrollContent: {
+    paddingBottom: 100,
+  }
 });

@@ -331,10 +331,12 @@ const styles = StyleSheet.create({
   },
   trainImage: {
     position: "absolute",
-    top: 2,
-    width: 70,
-    height: 70,
+    top: -25,
+    width: 160,
+    height: 110,
     resizeMode: "contain",
+    zIndex: 10,
+    transform: [{ translateX: -90 }],
   },
   scrollContent: { paddingBottom: 100 },
   trackerCard: {

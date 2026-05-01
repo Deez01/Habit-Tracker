@@ -4,6 +4,12 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 /*
+  Expo Router is used to navigate the user back to the sign-in screen
+  after logging out.
+*/
+import { router } from "expo-router";
+
+/*
   Custom hook that loads and prepares all profile-page data:
   - username
   - avatar
@@ -15,6 +21,12 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useProfileData } from "@/hooks/useProfileData";
 
 /*
+  Supabase client used for authentication.
+  This allows the profile page to sign the user out.
+*/
+import { supabase } from "@/supabase/supabase";
+
+/*
   React Native UI primitives used to build the screen layout.
 */
 import {
@@ -23,6 +35,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 
@@ -126,6 +139,7 @@ function ChartBar({ label, value, maxValue, width = 18 }: ChartBarProps) {
   2. Show habit stats such as active habit count and best current streak.
   3. Show today's completion summary.
   4. Render weekly, monthly, and yearly rail-style completion charts.
+  5. Allow the user to log out of their account.
 */
 export default function AboutPageScreen() {
   /*
@@ -144,6 +158,24 @@ export default function AboutPageScreen() {
     yearlyData,
     bestCurrentStreak,
   } = useProfileData();
+
+  /*
+    handleLogout
+    ------------
+    Signs the current user out using Supabase authentication.
+
+    After the sign out finishes, router.replace sends the user back
+    to the sign-in screen and removes the profile page from the
+    navigation history.
+  */
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      router.replace("/(auth)/sign-in");
+    } catch (error) {
+      console.log("Logout error:", error);
+    }
+  };
 
   /*
     Max values for each chart
@@ -300,6 +332,14 @@ export default function AboutPageScreen() {
                 </View>
               </ScrollView>
             </View>
+
+            {/* ===== LOGOUT BUTTON ===== */}
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={handleLogout}
+            >
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
           </>
         )}
       </ScrollView>
@@ -669,5 +709,28 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     resizeMode: "contain",
+  },
+
+  /*
+    Logout button
+    -------------
+    Allows the user to manually sign out from the profile screen.
+  */
+  logoutButton: {
+    marginTop: 30,
+    marginHorizontal: 18,
+    backgroundColor: "#c0392b",
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+
+  /*
+    Logout button text
+  */
+  logoutText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "800",
   },
 });
