@@ -68,7 +68,6 @@ export default function SignInScreen() {
   useEffect(() => {
     /**
      * Whenever the session changes:
-     * - check if the user has completed onboarding
      * - route them to the correct screen
      */
 
@@ -88,20 +87,8 @@ export default function SignInScreen() {
         return;
       }
 
-      // If no profile exists yet, send user to onboarding
-      if (!profile) {
-        router.replace("/(auth)/onboarding");
-        return;
-      }
-
-      // If onboarding is complete → go to main app
-      if (profile.profile_complete) {
-        router.replace("/(tabs)");
-      } 
-      // Otherwise → finish onboarding first
-      else {
-        router.replace("/(auth)/onboarding");
-      }
+      
+      router.replace("/(tabs)");
     };
 
     checkProfileAndRoute();
@@ -160,13 +147,15 @@ export default function SignInScreen() {
 
         /**
          * Create a row in the "users" table
-         * This stores extra app-specific data (username, onboarding status)
+         * This stores extra app-specific data (username)
          */
         const { error: upsertError } = await supabase.from("users").upsert({
           id: userId,
           email: email.trim(),
           username: username.trim(),
-          profile_complete: false, // onboarding not finished yet
+
+          
+          profile_complete: true,
         });
 
         if (upsertError) throw upsertError;
@@ -181,7 +170,6 @@ export default function SignInScreen() {
 
   return (
     <ThemedView style={styles.container} lightColor="#fff" darkColor="#151718">
-      {/* Keeps inputs visible when keyboard opens */}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.content}
@@ -194,12 +182,6 @@ export default function SignInScreen() {
         >
           <ThemedText type="title">Welcome to StayonTrack</ThemedText>
 
-          {/* 
-            If in sign-in mode:
-            - only show email field
-            If in sign-up mode:
-            - show email + username
-          */}
           {mode === "signIn" ? (
             <TextInput
               placeholder="Email"
@@ -230,7 +212,6 @@ export default function SignInScreen() {
             </>
           )}
 
-          {/* Password field (used in both modes) */}
           <TextInput
             placeholder="Password"
             placeholderTextColor={theme.icon}
@@ -240,10 +221,8 @@ export default function SignInScreen() {
             style={[styles.input, { borderColor: theme.icon, color: theme.text }]}
           />
 
-          {/* Display error if one exists */}
           {error && <ThemedText style={{ color: "#B00020" }}>{error}</ThemedText>}
 
-          {/* Submit button */}
           <Pressable
             onPress={handleSubmit}
             disabled={busy}
@@ -254,7 +233,6 @@ export default function SignInScreen() {
             </ThemedText>
           </Pressable>
 
-          {/* Toggle between sign-in and sign-up */}
           <Pressable onPress={() => setMode(mode === "signIn" ? "signUp" : "signIn")}>
             <ThemedText style={{ color: theme.tint }}>
               {mode === "signIn"
@@ -269,21 +247,10 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
-  // Full screen container
   container: { flex: 1, justifyContent: "center", padding: 20 },
-
-  // Limits width on larger screens
   content: { width: "100%", maxWidth: 420 },
-
-  // Card containing form
   card: { borderWidth: 1, borderRadius: 16, padding: 20, gap: 12 },
-
-  // Input styling
   input: { borderWidth: 1, borderRadius: 12, padding: 12 },
-
-  // Submit button
   button: { borderRadius: 12, paddingVertical: 12, alignItems: "center" },
-
-  // Button text
   buttonText: { fontWeight: "600" },
 });
