@@ -1,33 +1,43 @@
 /*
-  External icon library used for the star badge in the "Today's Route" card.
+ External icon library used for the star badge in the "Today's Route"
+card.
 */
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 /*
-  Expo Router is used to navigate the user back to the sign-in screen
-  after logging out.
+ Expo Router is used to navigate the user back to the sign-in screen
+ after logging out.
+
+ useFocusEffect is used to refresh the profile data every time the
+ Profile tab becomes active.
 */
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 
 /*
-  Custom hook that loads and prepares all profile-page data:
-  - username
-  - avatar
-  - habit count
-  - today's completed count
-  - weekly/monthly/yearly chart data
-  - best current streak
+ useCallback is used with useFocusEffect so the refresh function runs
+ safely when the screen is focused.
+*/
+import { useCallback, useState } from "react";
+
+/*
+ Custom hook that loads and prepares all profile-page data:
+ - username
+ - avatar
+ - habit count
+ - today's completed count
+ - weekly/monthly/yearly chart data
+ - best current streak
 */
 import { useProfileData } from "@/hooks/useProfileData";
 
 /*
-  Supabase client used for authentication.
-  This allows the profile page to sign the user out.
+ Supabase client used for authentication.
+ This allows the profile page to sign the user out.
 */
 import { supabase } from "@/supabase/supabase";
 
 /*
-  React Native UI primitives used to build the screen layout.
+ React Native UI primitives used to build the screen layout.
 */
 import {
   ActivityIndicator,
@@ -40,9 +50,9 @@ import {
 } from "react-native";
 
 /*
-  ChartBarProps
-  -------------
-  Props for one vertical rail-style chart bar.
+ ChartBarProps
+ -------------
+ Props for one vertical rail-style chart bar.
 */
 type ChartBarProps = {
   label: string;
@@ -52,38 +62,38 @@ type ChartBarProps = {
 };
 
 /*
-  ChartBar
-  --------
-  Renders one rail-style chart bar made of:
-  - two vertical rails
-  - several horizontal rungs
-  - filled rungs to represent progress/value
+ ChartBar
+ --------
+ Renders one rail-style chart bar made of:
+ - two vertical rails
+ - several horizontal rungs
+ - filled rungs to represent progress/value
 
-  The number of filled rungs is based on the value relative to maxValue.
+ The number of filled rungs is based on the value relative to maxValue.
 */
 function ChartBar({ label, value, maxValue, width = 18 }: ChartBarProps) {
   /*
-    trackHeight
-    -----------
-    Visual height of the bar/rail area.
+   trackHeight
+   -----------
+   Visual height of the bar/rail area.
   */
   const trackHeight = 110;
 
   /*
-    safeMax
-    -------
-    Prevents division by zero if maxValue is 0.
+   safeMax
+   -------
+   Prevents division by zero if maxValue is 0.
   */
   const safeMax = Math.max(maxValue, 1);
 
   /*
-    rungCount
-    ---------
-    Total number of horizontal rungs shown on the rail.
+   rungCount
+   ---------
+   Total number of horizontal rungs shown on the rail.
 
-    filledRungs
-    -----------
-    Number of rungs that should appear highlighted based on the value.
+   filledRungs
+   -----------
+   Number of rungs that should appear highlighted based on the value.
   */
   const rungCount = 6;
   const filledRungs =
@@ -109,12 +119,12 @@ function ChartBar({ label, value, maxValue, width = 18 }: ChartBarProps) {
                 styles.railRung,
                 {
                   /*
-                    Each rung is positioned vertically based on its index.
+                   Each rung is positioned vertically based on its index.
                   */
                   top: (trackHeight / rungCount) * index + 6,
                 },
                 /*
-                  Filled rungs use a highlight color.
+                 Filled rungs use a highlight color.
                 */
                 isFilled && styles.railRungFilled,
               ]}
@@ -130,22 +140,24 @@ function ChartBar({ label, value, maxValue, width = 18 }: ChartBarProps) {
 }
 
 /*
-  AboutPageScreen
-  ---------------
-  Profile page for the app.
+ AboutPageScreen
+ ---------------
+ Profile page for the app.
 
-  Responsibilities:
-  1. Show the user's avatar and username.
-  2. Show habit stats such as active habit count and best current streak.
-  3. Show today's completion summary.
-  4. Render weekly, monthly, and yearly rail-style completion charts.
-  5. Allow the user to log out of their account.
+ Responsibilities:
+ 1. Show the user's avatar and username.
+ 2. Show habit stats such as active habit count and best current streak.
+ 3. Show today's completion summary.
+ 4. Render weekly, monthly, and yearly rail-style completion charts.
+ 5. Allow the user to log out of their account.
 */
 export default function AboutPageScreen() {
+  const [reloadKey, setReloadKey] = useState(0);
+
   /*
-    useProfileData
-    --------------
-    Provides all data needed by this screen.
+   useProfileData
+   --------------
+   Provides all data needed by this screen.
   */
   const {
     loading,
@@ -157,16 +169,29 @@ export default function AboutPageScreen() {
     monthlyData,
     yearlyData,
     bestCurrentStreak,
+    refresh,
   } = useProfileData();
 
   /*
-    handleLogout
-    ------------
-    Signs the current user out using Supabase authentication.
+   Refresh profile data when the Profile tab becomes active.
+   This keeps today's completed habits, charts, and streak stats synced
+   after the user completes or uncompletes habits on the Today screen.
+  */
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+      setReloadKey((prev) => prev + 1);
+    }, [refresh]),
+  );
 
-    After the sign out finishes, router.replace sends the user back
-    to the sign-in screen and removes the profile page from the
-    navigation history.
+  /*
+   handleLogout
+   ------------
+   Signs the current user out using Supabase authentication.
+
+   After the sign out finishes, router.replace sends the user back
+   to the sign-in screen and removes the profile page from the
+   navigation history.
   */
   const handleLogout = async () => {
     try {
@@ -178,16 +203,16 @@ export default function AboutPageScreen() {
   };
 
   /*
-    Max values for each chart
-    -------------------------
-    Used to scale each chart so the highest value fills the most rungs.
+   Max values for each chart
+   -------------------------
+   Used to scale each chart so the highest value fills the most rungs.
   */
   const weekMax = Math.max(...weeklyData.map((item) => item.value), 1);
   const monthMax = Math.max(...monthlyData.map((item) => item.value), 1);
   const yearMax = Math.max(...yearlyData.map((item) => item.value), 1);
 
   return (
-    <View style={styles.screen}>
+    <View style={styles.screen} key={reloadKey}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -257,6 +282,7 @@ export default function AboutPageScreen() {
             {/* ===== TODAY SUMMARY ===== */}
             <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Today's Route</Text>
+
               <View style={styles.todayRow}>
                 {/* Star badge */}
                 <View style={styles.todayBadge}>
@@ -270,7 +296,9 @@ export default function AboutPageScreen() {
                 {/* Today's completion count */}
                 <View style={styles.todayTextWrap}>
                   <Text style={styles.todayCount}>{todayCompleted}</Text>
-                  <Text style={styles.todayLabel}>habits completed today</Text>
+                  <Text style={styles.todayLabel}>
+                    habits completed today
+                  </Text>
                 </View>
               </View>
             </View>
@@ -334,10 +362,7 @@ export default function AboutPageScreen() {
             </View>
 
             {/* ===== LOGOUT BUTTON ===== */}
-            <TouchableOpacity
-              style={styles.logoutButton}
-              onPress={handleLogout}
-            >
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
               <Text style={styles.logoutText}>Logout</Text>
             </TouchableOpacity>
           </>
@@ -348,13 +373,13 @@ export default function AboutPageScreen() {
 }
 
 /*
-  Styles
-  ------
-  Defines layout, spacing, and visual design for the profile page.
+ Styles
+ ------
+ Defines layout, spacing, and visual design for the profile page.
 */
 const styles = StyleSheet.create({
   /*
-    Main screen container
+   Main screen container
   */
   screen: {
     flex: 1,
@@ -362,14 +387,14 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Scroll container padding
+   Scroll container padding
   */
   scrollContent: {
     paddingBottom: 120,
   },
 
   /*
-    Top hero section containing the page title and profile card
+   Top hero section containing the page title and profile card
   */
   heroSection: {
     backgroundColor: "#6f92d6",
@@ -381,7 +406,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Main page title
+   Main page title
   */
   heroTitle: {
     color: "#ffffff",
@@ -391,7 +416,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Subtitle under the main title
+   Subtitle under the main title
   */
   heroSubtitle: {
     color: "#dbe7ff",
@@ -400,7 +425,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Card holding avatar and profile stats
+   Card holding avatar and profile stats
   */
   profileCard: {
     backgroundColor: "#1f2430",
@@ -414,7 +439,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Outer avatar circle
+   Outer avatar circle
   */
   avatarOuter: {
     width: 86,
@@ -425,7 +450,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Inner avatar circle
+   Inner avatar circle
   */
   avatarInner: {
     width: 66,
@@ -436,14 +461,14 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Right side of the profile card
+   Right side of the profile card
   */
   profileInfo: {
     flex: 1,
   },
 
   /*
-    Username display
+   Username display
   */
   usernameText: {
     color: "#ffffff",
@@ -453,7 +478,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Small subtitle under username
+   Small subtitle under username
   */
   profileSubtext: {
     color: "#b8c6de",
@@ -462,7 +487,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Row of profile stat pills
+   Row of profile stat pills
   */
   profileStatsRow: {
     flexDirection: "row",
@@ -470,7 +495,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Small stat card within the profile card
+   Small stat card within the profile card
   */
   profileStatPill: {
     flex: 1,
@@ -481,7 +506,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Large stat number
+   Large stat number
   */
   profileStatNumber: {
     color: "#ffffff",
@@ -490,7 +515,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Small stat label
+   Small stat label
   */
   profileStatLabel: {
     color: "#c8d1e3",
@@ -499,7 +524,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Loading card shown while profile data is being fetched
+   Loading card shown while profile data is being fetched
   */
   loadingCard: {
     marginTop: 20,
@@ -511,7 +536,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Loading text under the spinner
+   Loading text under the spinner
   */
   loadingText: {
     color: "#ffffff",
@@ -520,7 +545,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Generic section card used for today/weekly/monthly/yearly sections
+   Generic section card used for today/weekly/monthly/yearly sections
   */
   sectionCard: {
     marginTop: 18,
@@ -533,7 +558,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Section title text
+   Section title text
   */
   sectionTitle: {
     color: "#ffffff",
@@ -543,7 +568,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Today summary row inside the Today's Route card
+   Today summary row inside the Today's Route card
   */
   todayRow: {
     backgroundColor: "#f6e6c5",
@@ -556,7 +581,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Circular badge holding the star icon
+   Circular badge holding the star icon
   */
   todayBadge: {
     width: 58,
@@ -569,14 +594,14 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Wrapper for today's text count and label
+   Wrapper for today's text count and label
   */
   todayTextWrap: {
     flex: 1,
   },
 
   /*
-    Today's completion count
+   Today's completion count
   */
   todayCount: {
     color: "#111111",
@@ -585,7 +610,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Small label under today's count
+   Small label under today's count
   */
   todayLabel: {
     color: "#3d3d3d",
@@ -594,8 +619,8 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Weekly chart row
-    Uses space-between so the 7 bars stretch across the whole card.
+   Weekly chart row
+   Uses space-between so the 7 bars stretch across the whole card.
   */
   chartRowWide: {
     flexDirection: "row",
@@ -606,8 +631,8 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Yearly chart row
-    Horizontal row with spacing between monthly bars.
+   Yearly chart row
+   Horizontal row with spacing between monthly bars.
   */
   chartRowWideYear: {
     flexDirection: "row",
@@ -617,8 +642,8 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Monthly chart row
-    Scrollable horizontal row because there are many day bars.
+   Monthly chart row
+   Scrollable horizontal row because there are many day bars.
   */
   chartRowMonth: {
     flexDirection: "row",
@@ -628,7 +653,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Wrapper around each chart bar
+   Wrapper around each chart bar
   */
   barItem: {
     alignItems: "center",
@@ -636,7 +661,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Container for one rail bar
+   Container for one rail bar
   */
   railTrack: {
     height: 110,
@@ -647,7 +672,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Left rail of a chart bar
+   Left rail of a chart bar
   */
   railLineLeft: {
     position: "absolute",
@@ -661,7 +686,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Right rail of a chart bar
+   Right rail of a chart bar
   */
   railLineRight: {
     position: "absolute",
@@ -675,7 +700,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Horizontal rung between the two rails
+   Horizontal rung between the two rails
   */
   railRung: {
     position: "absolute",
@@ -687,14 +712,14 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Highlighted rung for filled progress
+   Highlighted rung for filled progress
   */
   railRungFilled: {
     backgroundColor: "#c2a07e",
   },
 
   /*
-    Small label below each chart bar
+   Small label below each chart bar
   */
   barLabel: {
     color: "#ffffff",
@@ -703,7 +728,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Train avatar image inside the profile card
+   Train avatar image inside the profile card
   */
   avatarImage: {
     width: 40,
@@ -712,9 +737,9 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Logout button
-    -------------
-    Allows the user to manually sign out from the profile screen.
+   Logout button
+   -------------
+   Allows the user to manually sign out from the profile screen.
   */
   logoutButton: {
     marginTop: 30,
@@ -726,7 +751,7 @@ const styles = StyleSheet.create({
   },
 
   /*
-    Logout button text
+   Logout button text
   */
   logoutText: {
     color: "#ffffff",
