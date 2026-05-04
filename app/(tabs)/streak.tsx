@@ -37,7 +37,7 @@ export default function StreakScreen() {
       {/* ===== HEADER SECTION ===== */}
       <View style={[styles.heroSection, { backgroundColor: theme.primary }]}>
         <Text style={styles.title}>Longest Streaks</Text>
-        <Text style={styles.subtitle}>Your strongest habit routes</Text>
+        <Text style={styles.subtitle}>Stay on track!</Text>
 
         {/* Summary card showing the top streak across all habits */}
         <View

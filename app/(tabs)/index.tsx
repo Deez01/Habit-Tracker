@@ -62,6 +62,8 @@ export default function HomeScreen() {
       useNativeDriver: false, // False because we're animating "left" which is not a transform
     }).start();
   }, [progress, trainProgress]);
+  }, [progress]);
+  const stations = Array.from({ length: totalCount }, (_, i) => i);
 
   return (
     <View style={styles.screen}>
@@ -75,36 +77,40 @@ export default function HomeScreen() {
         <View style={styles.railContainer}>
           {/* Background track - always visible */}
           <View style={styles.trackBase}>
-            <View
+            <Animated.View
               style={[
                 styles.trackProgress,
                 { width: `${progress * 100}%`, backgroundColor: theme.success },
+                    outputRange: ["0%", "95%"],
+                  }),
+                  backgroundColor: theme.success,
+                },
               ]}
             />
           </View>
 
-          {/* Station markers - one for each habit, positioned along the track */}
-          {todayHabits.map((habit, index) => {
-            // Calculate percentage position for this station
-            // trackStart = 11% (left edge), trackEnd = 86% (right edge)
+          {/* Station markers - based on # habits completed */}
+          {stations.map((stationIndex) => {
             const trackStart = 11;
             const trackEnd = 86;
             const usableTrack = trackEnd - trackStart;
             const stationLeft: `${number}%` =
               totalCount <= 1
                 ? `${trackStart}%`
-                : `${trackStart + (index / (totalCount - 1)) * usableTrack}%`;
+                : `${trackStart + (stationIndex / (totalCount - 1)) * usableTrack}%`;
+
+            const isStationCompleted = stationIndex < completedCount;
 
             return (
               <View
-                key={habit.id}
+                key={`station-${stationIndex}`}
                 style={[styles.stationWrap, { left: stationLeft }]}
               >
                 <MaterialCommunityIcons
                   name="storefront"
                   size={18}
                   color={
-                    habit.completed_today ? theme.cardBackground : theme.success
+                    isStationCompleted ? theme.success : theme.cardBackground
                   }
                 />
               </View>
@@ -119,7 +125,7 @@ export default function HomeScreen() {
               {
                 left: trainProgress.interpolate({
                   inputRange: [0, 1],
-                  outputRange: ["-4%" as const, "80%" as const],
+                  outputRange: ["-4%" as const, "91%" as const],
                 }),
               },
             ]}
@@ -280,8 +286,6 @@ export default function HomeScreen() {
 }
 
 // ===== STYLES =====
-// Note: Some colors remain hardcoded where they are design-specific and not theme-dependent
-// (e.g., white text on dark backgrounds, black text on light backgrounds)
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#000000" },
   topSection: {
@@ -374,7 +378,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 16,
   },
-  completedHeaderWrapper: { alignItems: "center", marginTop: -30 },
+  completedHeaderWrapper: {
+    alignItems: "center",
+    marginTop: -30,
+  },
   completedHeaderPill: {
     borderRadius: 20,
     paddingHorizontal: 30,
@@ -390,7 +397,6 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     justifyContent: "center",
     alignItems: "center",
-    // Shadow for elevation on iOS and Android
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
