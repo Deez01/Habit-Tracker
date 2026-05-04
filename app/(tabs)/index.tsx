@@ -61,8 +61,9 @@ export default function HomeScreen() {
       duration: 450, // Smooth 450ms movement
       useNativeDriver: false, // False because we're animating "left" which is not a transform
     }).start();
-  }, [progress, trainProgress]);
   }, [progress]);
+
+  // Create stations array based on total count
   const stations = Array.from({ length: totalCount }, (_, i) => i);
 
   return (
@@ -80,7 +81,9 @@ export default function HomeScreen() {
             <Animated.View
               style={[
                 styles.trackProgress,
-                { width: `${progress * 100}%`, backgroundColor: theme.success },
+                {
+                  width: trainProgress.interpolate({
+                    inputRange: [0, 1],
                     outputRange: ["0%", "95%"],
                   }),
                   backgroundColor: theme.success,
