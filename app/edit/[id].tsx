@@ -134,6 +134,11 @@ export default function EditHabitScreen() {
     return `${year}-${month}-${day}`;
   }
 
+  if (habitName.trim().length < 3) {
+    Alert.alert("Invalid Habit", "Habit names must be at least 3 characters.");
+    return;
+  }
+
   /**
    * Updates the habit in Supabase with the edited values.
    */
