@@ -97,6 +97,15 @@ export default function CreateHabitScreen() {
       return;
     }
 
+    // Habit names must be a minimum of 3 characters.
+    if (habitName.trim().length < 3) {
+      Alert.alert(
+        "Invalid Habit",
+        "Habit names must be at least 3 characters.",
+      );
+      return;
+    }
+
     // Prevent duplicate submissions
     if (busy) return;
     setBusy(true);
@@ -129,17 +138,6 @@ export default function CreateHabitScreen() {
         default:
           // daily and one_time don't need extra recurrence data
           break;
-      }
-
-      /**
-       * Habit names must be a minimum of 3 characters.
-       */
-      if (habitName.trim().length < 3) {
-        Alert.alert(
-          "Invalid Habit",
-          "Habit names must be at least 3 characters.",
-        );
-        return;
       }
 
       // Insert the new habit into the database

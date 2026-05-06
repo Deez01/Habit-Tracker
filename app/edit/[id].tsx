@@ -135,14 +135,6 @@ export default function EditHabitScreen() {
   }
 
   /**
-   * Habit names must be a minimum of 3 characters.
-   */
-  if (habitName.trim().length < 3) {
-    Alert.alert("Invalid Habit", "Habit names must be at least 3 characters.");
-    return;
-  }
-
-  /**
    * Updates the habit in Supabase with the edited values.
    */
   const handleUpdateHabit = async () => {
@@ -150,6 +142,14 @@ export default function EditHabitScreen() {
 
     if (!trimmedHabit) {
       Alert.alert("Missing habit", "Please enter a habit name.");
+      return;
+    }
+
+    if (habitName.trim().length < 3) {
+      Alert.alert(
+        "Invalid Habit",
+        "Habit names must be at least 3 characters.",
+      );
       return;
     }
 
