@@ -131,6 +131,17 @@ export default function CreateHabitScreen() {
           break;
       }
 
+      /**
+       * Habit names must be a minimum of 3 characters.
+       */
+      if (habitName.trim().length < 3) {
+        Alert.alert(
+          "Invalid Habit",
+          "Habit names must be at least 3 characters.",
+        );
+        return;
+      }
+
       // Insert the new habit into the database
       const { error } = await supabase.from("habits").insert({
         user_id: user.id,
@@ -504,5 +515,5 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 100,
-  }
+  },
 });

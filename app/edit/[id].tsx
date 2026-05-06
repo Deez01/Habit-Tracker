@@ -134,6 +134,9 @@ export default function EditHabitScreen() {
     return `${year}-${month}-${day}`;
   }
 
+  /**
+   * Habit names must be a minimum of 3 characters.
+   */
   if (habitName.trim().length < 3) {
     Alert.alert("Invalid Habit", "Habit names must be at least 3 characters.");
     return;
